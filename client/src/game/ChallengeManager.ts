@@ -2,12 +2,13 @@
 import { Color3, Mesh, MeshBuilder, Scene, StandardMaterial, TransformNode, Vector3 } from "@babylonjs/core";
 import type { ChallengeReadout } from "./types";
 
-const BEST_KEY = "cyberpunk-megapolis.skyrail-circuit.best";
+const BEST_KEY = "cyberpunk-megapolis.skyrail-circuit.bests.v2";
+const LEGACY_BEST_KEY = "cyberpunk-megapolis.skyrail-circuit.best";
 
-const ROUTES: Array<{ label: string; nodes: Array<[string, Vector3]> }> = [
-  { label: "SKYRAIL CIRCUIT", nodes: [["STREET LAUNCH", new Vector3(0, 4.8, 22)], ["SIGNAL PYLON", new Vector3(14, 31, -78)], ["CIVIC CROWN", new Vector3(-32, 50, -38)], ["NORTH RAIL", new Vector3(-38, 19, 82)], ["SKYLINE EXIT", new Vector3(82, 31, 20)]] },
-  { label: "MARKET DROP", nodes: [["MARKET GATE", new Vector3(32, 12, 94)], ["STACKED WALK", new Vector3(45, 23, 100)], ["GLASS BRIDGE", new Vector3(59, 28, 64)], ["ARCADE PORTAL", new Vector3(57, 12, -59)], ["CANAL EXIT", new Vector3(86, 11, 18)]] },
-  { label: "FOUNDRY ELEVATION", nodes: [["FOUNDRY FLOOR", new Vector3(-85, 7, 76)], ["VENT ARRAY", new Vector3(-83, 16, 78)], ["CATWALK BEND", new Vector3(-69, 25, 52)], ["RAIL JUNCTION", new Vector3(-38, 23, 82)], ["CROWN RETURN", new Vector3(-32, 50, -38)]] },
+const ROUTES: Array<{ label: string; par: number; nodes: Array<[string, Vector3]> }> = [
+  { label: "SKYRAIL CIRCUIT", par: 23, nodes: [["STREET LAUNCH", new Vector3(0, 4.8, 22)], ["SIGNAL PYLON", new Vector3(14, 31, -78)], ["CIVIC CROWN", new Vector3(-32, 50, -38)], ["NORTH RAIL", new Vector3(-38, 19, 82)], ["SKYLINE EXIT", new Vector3(82, 31, 20)]] },
+  { label: "MARKET DROP", par: 25, nodes: [["MARKET GATE", new Vector3(32, 12, 94)], ["STACKED WALK", new Vector3(45, 23, 100)], ["GLASS BRIDGE", new Vector3(59, 28, 64)], ["ARCADE PORTAL", new Vector3(57, 12, -59)], ["CANAL EXIT", new Vector3(86, 11, 18)]] },
+  { label: "FOUNDRY ELEVATION", par: 27, nodes: [["FOUNDRY FLOOR", new Vector3(-85, 7, 76)], ["VENT ARRAY", new Vector3(-83, 16, 78)], ["CATWALK BEND", new Vector3(-69, 25, 52)], ["RAIL JUNCTION", new Vector3(-38, 23, 82)], ["CROWN RETURN", new Vector3(-32, 50, -38)]] },
 ];
 
 interface RouteNode { label: string; position: Vector3; marker: Mesh; }
@@ -23,6 +24,7 @@ export class ChallengeManager {
   private running = false;
   private completed = false;
   private bestTime: number | null;
+  private readonly bestTimes: Record<string, number>;
   private routeIndex = 0;
 
   public constructor(private readonly scene: Scene) {
@@ -30,7 +32,8 @@ export class ChallengeManager {
     this.activeMaterial = this.makeMaterial("challenge-active", "#194b50", "#43f6e8");
     this.idleMaterial = this.makeMaterial("challenge-idle", "#223141", "#28505c");
     this.completeMaterial = this.makeMaterial("challenge-complete", "#503619", "#f6a84d");
-    this.bestTime = this.loadBest();
+    this.bestTimes = this.loadBests();
+    this.bestTime = this.bestTimes[ROUTES[this.routeIndex].label] ?? null;
     this.populateRoute();
     this.refreshMarkers();
   }
@@ -40,6 +43,7 @@ export class ChallengeManager {
 
   public nextRoute(): void {
     this.routeIndex = (this.routeIndex + 1) % ROUTES.length;
+    this.bestTime = this.bestTimes[ROUTES[this.routeIndex].label] ?? null;
     while (this.nodes.length) this.nodes.pop()?.marker.dispose();
     this.populateRoute();
     this.start();
@@ -59,7 +63,11 @@ export class ChallengeManager {
     if (this.nodeIndex >= this.nodes.length) {
       this.running = false;
       this.completed = true;
-      if (this.bestTime === null || this.elapsed < this.bestTime) { this.bestTime = this.elapsed; this.saveBest(this.elapsed); }
+      if (this.bestTime === null || this.elapsed < this.bestTime) {
+        this.bestTime = this.elapsed;
+        this.bestTimes[ROUTES[this.routeIndex].label] = this.elapsed;
+        this.saveBests();
+      }
     }
     this.refreshMarkers();
     return true;
@@ -67,7 +75,10 @@ export class ChallengeManager {
 
   public readout(): ChallengeReadout {
     const active = this.nodes[Math.min(this.nodeIndex, this.nodes.length - 1)];
-    return { route: ROUTES[this.routeIndex].label, state: this.completed ? "complete" : this.running ? "active" : "idle", node: Math.min(this.nodeIndex + 1, this.nodes.length), total: this.nodes.length, target: active?.label ?? "CIRCUIT CLEAR", elapsed: Math.round(this.elapsed * 10) / 10, best: this.bestTime === null ? null : Math.round(this.bestTime * 10) / 10 };
+    const best = this.bestTime === null ? null : Math.round(this.bestTime * 10) / 10;
+    const par = ROUTES[this.routeIndex].par;
+    const medal = best === null ? null : best <= par * 0.8 ? "kinetic" : best <= par ? "vector" : "signal";
+    return { route: ROUTES[this.routeIndex].label, state: this.completed ? "complete" : this.running ? "active" : "idle", node: Math.min(this.nodeIndex + 1, this.nodes.length), total: this.nodes.length, target: active?.label ?? "CIRCUIT CLEAR", elapsed: Math.round(this.elapsed * 10) / 10, best, medal };
   }
 
   public getActivePosition(): Vector3 | null { return this.nodes[this.nodeIndex]?.position.clone() ?? null; }
@@ -101,6 +112,14 @@ export class ChallengeManager {
     return material;
   }
 
-  private loadBest(): number | null { try { const value = window.localStorage.getItem(BEST_KEY); return value === null || Number.isNaN(Number(value)) ? null : Number(value); } catch { return null; } }
-  private saveBest(value: number): void { try { window.localStorage.setItem(BEST_KEY, String(value)); } catch { /* storage is optional */ } }
+  private loadBests(): Record<string, number> {
+    try {
+      const parsed = JSON.parse(window.localStorage.getItem(BEST_KEY) ?? "{}") as Record<string, number>;
+      if (parsed && typeof parsed === "object") return Object.fromEntries(Object.entries(parsed).filter(([, value]) => Number.isFinite(value) && value > 0));
+      const legacy = Number(window.localStorage.getItem(LEGACY_BEST_KEY));
+      return Number.isFinite(legacy) && legacy > 0 ? { [ROUTES[0].label]: legacy } : {};
+    } catch { return {}; }
+  }
+
+  private saveBests(): void { try { window.localStorage.setItem(BEST_KEY, JSON.stringify(this.bestTimes)); } catch { /* storage is optional */ } }
 }

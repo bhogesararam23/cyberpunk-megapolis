@@ -1,6 +1,14 @@
 import { Color3, Color4, DirectionalLight, GlowLayer, HemisphericLight, Scene } from "@babylonjs/core";
 import type { WeatherMode } from "./WeatherSystem";
 
+export interface AtmosphereProfile {
+  phase: "night" | "dawn" | "blue-hour" | "dusk";
+  bedFrequency: number;
+  overtoneFrequency: number;
+  luminance: number;
+  weather: WeatherMode;
+}
+
 interface AtmosphereKeyframe {
   at: number;
   clear: Color4;
@@ -22,6 +30,7 @@ const KEYFRAMES: AtmosphereKeyframe[] = [
 
 export class TimeOfDaySystem {
   private elapsed = 120;
+  private profile: AtmosphereProfile = { phase: "blue-hour", bedFrequency: 46, overtoneFrequency: 118, luminance: 0.6, weather: "rain" };
 
   public constructor(
     private readonly scene: Scene,
@@ -46,5 +55,17 @@ export class TimeOfDaySystem {
     this.hemisphere.intensity = (current.skyIntensity + (next.skyIntensity - current.skyIntensity) * mix) * weatherDim;
     this.horizon.intensity = (current.horizonIntensity + (next.horizonIntensity - current.horizonIntensity) * mix) * weatherDim;
     this.glow.intensity = current.glow + (next.glow - current.glow) * mix + stormGlow;
+    const luminance = (this.hemisphere.intensity + this.horizon.intensity) * 0.5;
+    const phase = time < 0.18 || time >= 0.78 ? "night" : time < 0.38 ? "dawn" : time < 0.62 ? "blue-hour" : "dusk";
+    const phaseOffset = phase === "night" ? -8 : phase === "dawn" ? 14 : phase === "dusk" ? 8 : 0;
+    this.profile = {
+      phase,
+      bedFrequency: 44 + phaseOffset + (weather === "storm" ? -6 : 0),
+      overtoneFrequency: 110 + phaseOffset * 2 + (weather === "rain" ? 8 : weather === "storm" ? 16 : 0),
+      luminance,
+      weather,
+    };
   }
+
+  public get readout(): AtmosphereProfile { return this.profile; }
 }

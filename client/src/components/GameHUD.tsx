@@ -11,9 +11,12 @@ const initial: GameStatus = {
   target: "SCANNING", targetDistance: 0, anchorCue: "scanning", quality: "high", fps: 0,
   notification: "Booting city lattice…", menuHint: "WASD move · Space jump · LMB swing · RMB zip · Q wall-run · E dive",
   weather: "rain", showcase: false,
-  challenge: { route: "SKYRAIL CIRCUIT", state: "idle", node: 1, total: 5, target: "STREET LAUNCH", elapsed: 0, best: null },
+  challenge: { route: "SKYRAIL CIRCUIT", state: "idle", node: 1, total: 5, target: "STREET LAUNCH", elapsed: 0, best: null, medal: null },
   progression: { discoveries: 0, discoveryTotal: 6, credits: 0, distance: 0, record: 0, nextLandmark: "SPECTRUM PORTAL", district: "COMMERCIAL ARCADE" },
   settings: { masterVolume: 0.7, sfxVolume: 0.82, ambienceVolume: 0.34, sensitivity: 1, fov: 0.96, invertY: false, screenShake: true, reducedMotion: false, highContrast: false },
+  sectors: { district: "civic-core", districtLabel: "CIVIC TRANSFER CORE", active: ["civic-core"], predicted: [] },
+  diagnostics: { fps: 60, frameMs: 16.7, drawCalls: 0, triangles: 0, activeMeshes: 0, activeActors: 0, activeSectors: 1, district: "civic-core", traversal: "idle", speed: 0, target: "SCANNING" },
+  diagnosticsVisible: false,
 };
 
 function emit<T>(name: string, detail?: T): void {
@@ -91,10 +94,11 @@ export default function GameHUD() {
             <span>{status.challenge.route} // {status.challenge.state.toUpperCase()}</span>
             <div className="route-line"><i /><i /><i /><i /></div>
             <span className="route-state"><Zap size={13} /> NODE {status.challenge.node}/{status.challenge.total} // {status.challenge.target}</span>
-            <span className="challenge-time">{status.challenge.elapsed.toFixed(1)}s {status.challenge.best === null ? "// NO BEST" : `// BEST ${status.challenge.best.toFixed(1)}s`}</span>
+            <span className="challenge-time">{status.challenge.elapsed.toFixed(1)}s {status.challenge.best === null ? "// NO BEST" : `// BEST ${status.challenge.best.toFixed(1)}s // ${status.challenge.medal?.toUpperCase() ?? "SIGNAL"}`}</span>
             <span className="discovery-state">{status.progression.discoveries}/{status.progression.discoveryTotal} CHARTED // {status.progression.credits} SIG // NEXT {status.progression.nextLandmark}</span>
           </section>
           <p className="system-note">{status.notification}</p>
+          {status.diagnosticsVisible && <DiagnosticsOverlay status={status} />}
           <div className="reticle" aria-hidden="true"><i /><i /><i /><i /></div>
         </>
       )}
@@ -190,6 +194,7 @@ function SettingsPanel({ status, reducedMotion, highContrast, onMotion, onContra
     <label className="motion-toggle"><span>REDUCED MOTION</span><input type="checkbox" checked={reducedMotion} onChange={(event) => onMotion(event.target.checked)} /></label>
     <label className="motion-toggle"><span>HIGH CONTRAST</span><input type="checkbox" checked={highContrast} onChange={(event) => { onContrast(event.target.checked); emit("megapolis:contrast", event.target.checked); }} /></label>
     <label className="motion-toggle"><span>SHOWCASE CAMERA</span><input type="checkbox" checked={status.showcase} onChange={(event) => emit<boolean>("megapolis:showcase", event.target.checked)} /></label>
+    <label className="motion-toggle"><span>DEV TELEMETRY</span><input type="checkbox" checked={status.diagnosticsVisible} onChange={(event) => emit<boolean>("megapolis:diagnostics", event.target.checked)} /></label>
     <small>Auto fallback protects frame time during dense traversal.</small>
   </aside>;
 }
@@ -197,4 +202,14 @@ function SettingsPanel({ status, reducedMotion, highContrast, onMotion, onContra
 function RangeControl({ label, value, min, max, step, onChange }: { label: string; value: number; min: number; max: number; step: number; onChange: (value: number) => void }) {
   const suffix = label === "FOV" ? "°" : "%";
   return <label className="range-control"><span>{label} <b>{Math.round(value * 100)}{suffix}</b></span><input aria-label={`${label} setting`} type="range" min={min} max={max} step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} /></label>;
+}
+
+function DiagnosticsOverlay({ status }: { status: GameStatus }) {
+  const telemetry = status.diagnostics;
+  return <aside className="diagnostics-overlay" aria-label="Developer telemetry">
+    <span>VNX // {status.sectors.districtLabel}</span>
+    <b>{telemetry.fps} FPS // {telemetry.frameMs.toFixed(1)} MS</b>
+    <small>SECTORS {telemetry.activeSectors} // ACTORS {telemetry.activeActors} // MESH {telemetry.activeMeshes}</small>
+    <small>STATE {telemetry.traversal.toUpperCase()} // {telemetry.speed} KM/H</small>
+  </aside>;
 }

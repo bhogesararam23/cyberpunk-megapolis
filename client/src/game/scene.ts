@@ -46,12 +46,12 @@ export async function createGameScene(engine: Engine, canvas: HTMLCanvasElement)
   quality = new QualityManager(engine, scene, glow, (preset: QualityPreset) => {
     window.dispatchEvent(new CustomEvent<QualityPreset>("megapolis:quality-ready", { detail: preset }));
   });
-  const world = new GameWorld(scene, input, city, player, camera, quality, weather, ambient);
+  const world = new GameWorld(scene, input, city, player, camera, quality, weather, ambient, timeOfDay);
   scene.onBeforeRenderObservable.add(() => {
     const rawDelta = scene.getEngine().getDeltaTime() / 1000;
     const delta = Math.min(0.05, Math.max(0.001, rawDelta));
-    world.update(delta);
     timeOfDay.update(delta, weather.currentMode);
+    world.update(delta);
   });
   return {
     scene,

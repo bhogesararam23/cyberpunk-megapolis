@@ -2,6 +2,7 @@
 import type { Scene } from "@babylonjs/core";
 import type { AmbientCitySystem } from "./AmbientCitySystem";
 import { AudioManager } from "./AudioManager";
+import { GameSignalBus } from "./GameSignals";
 import type { CameraRig } from "./CameraRig";
 import { ChallengeManager } from "./ChallengeManager";
 import type { CityBuilder } from "./CityBuilder";
@@ -9,9 +10,12 @@ import { InputManager } from "./InputManager";
 import { PlayerController } from "./PlayerController";
 import { ProgressionManager } from "./ProgressionManager";
 import { QualityManager } from "./QualityManager";
+import { RuntimeTelemetry } from "./RuntimeTelemetry";
 import { loadSettings, saveSettings, type GameplaySettings } from "./SettingsStore";
+import { SimulationDirector } from "./SimulationDirector";
+import type { TimeOfDaySystem } from "./TimeOfDaySystem";
 import type { WeatherSystem } from "./WeatherSystem";
-import type { CharacterId, GamePhase, GameStatus, InputSnapshot, QualityPreset, WeatherMode } from "./types";
+import type { CharacterId, GamePhase, GameStatus, InputSnapshot, QualityPreset, SectorReadout, WeatherMode } from "./types";
 
 const idleInput: InputSnapshot = {
   moveX: 0, moveY: 0, lookX: 0, lookY: 0, sprint: false, swingHeld: false, wallRunHeld: false,
@@ -34,6 +38,12 @@ export class GameWorld {
   private readonly progression: ProgressionManager;
   private settings: GameplaySettings;
   private readonly audio: AudioManager;
+  private readonly signals = new GameSignalBus();
+  private readonly simulation: SimulationDirector;
+  private readonly telemetry = new RuntimeTelemetry();
+  private eventIntensity = 0;
+  private sectors: SectorReadout = { district: "civic-core", districtLabel: "CIVIC TRANSFER CORE", active: ["civic-core"], predicted: [] };
+  private diagnosticsVisible = false;
 
   public constructor(
     private readonly scene: Scene,
@@ -44,12 +54,16 @@ export class GameWorld {
     private readonly quality: QualityManager,
     private readonly weather: WeatherSystem,
     private readonly ambient: AmbientCitySystem,
+    private readonly timeOfDay: TimeOfDaySystem,
   ) {
     this.demo = new URLSearchParams(window.location.search).has("demo");
     this.challenge = new ChallengeManager(scene);
     this.progression = new ProgressionManager(scene);
     this.settings = loadSettings();
     this.audio = new AudioManager(this.settings);
+    this.simulation = new SimulationDirector(this.ambient, this.signals, this.city);
+    this.player.setSignals(this.signals);
+    this.listeners.push(this.signals.subscribe((signal) => this.handleSignal(signal)));
     this.camera.setPreferences(this.settings);
     this.camera.setReducedMotion(this.settings.reducedMotion);
     this.weather.setDensity(this.quality.effectDensity);
@@ -71,9 +85,9 @@ export class GameWorld {
   }
 
   public update(delta: number): void {
+    this.audio.setEnvironment(this.timeOfDay.readout, this.eventIntensity);
     this.city.update(delta);
     this.weather.update(this.player.root.position, delta);
-    this.ambient.setDensity(this.quality.effectDensity);
     const raw = this.input.snapshot();
     if (this.phase === "selection") {
       if (raw.enterPressed) this.beginTraversal();
@@ -98,8 +112,10 @@ export class GameWorld {
         this.audio.update(this.player.getSpeed(), this.player.traversal, this.weatherMode, delta);
         this.camera.registerImpact(this.player.consumeImpact());
         this.camera.update(this.player.root.position, this.player.getSpeed(), this.city, delta, ["swing", "zip", "dive"].includes(this.player.traversal));
-        const ambientResponse = this.ambient.update(this.player.root.position, this.player.getSpeed(), delta);
-        if (ambientResponse) this.notification = ambientResponse;
+        const simulation = this.simulation.update(this.player.root.position, this.player.velocity, this.quality.effectDensity, delta);
+        this.sectors = simulation.sectors;
+        if (simulation.notification) this.notification = simulation.notification;
+        this.telemetry.update(this.scene, delta, { district: simulation.sectors.district, traversal: this.player.traversal, speed: this.player.getSpeed(), target: this.player.target?.id ?? "SCANNING", activeActors: simulation.activeActors, activeSectors: simulation.sectors.active.length + simulation.sectors.predicted.length });
         const discovery = this.progression.update(this.player.root.position, this.player.getSpeed(), delta);
         if (discovery) { this.notification = discovery; this.audio.cue("discover"); }
         if (this.challenge.update(this.player.root.position, delta)) {
@@ -137,6 +153,7 @@ export class GameWorld {
     this.challenge.dispose();
     this.progression.dispose();
     this.audio.dispose();
+    this.signals.clear();
     this.ambient.dispose();
     this.city.dispose();
   }
@@ -206,8 +223,25 @@ export class GameWorld {
   private setWeather(value: WeatherMode): void {
     this.weatherMode = value;
     this.weather.setMode(value);
+    this.signals.emit({ type: "environment", weather: value, intensity: value === "storm" ? 1 : value === "rain" ? 0.56 : 0.16 });
     this.notification = value === "clear" ? "Dry visibility profile active." : `${value.toUpperCase()} weather lattice active.`;
     this.publishStatus(true);
+  }
+
+  private handleSignal(signal: import("./GameSignals").GameSignal): void {
+    if (signal.type === "traversal") {
+      this.camera.registerTraversalSignal(signal);
+      if (signal.action === "web-attached") this.audio.cue("swing");
+      else if (signal.action === "zip-started") this.audio.cue("zip");
+      else if (signal.action === "landed") this.audio.cue("land");
+      if (signal.action === "chain" && signal.chain > 2) this.notification = `Chain ${signal.chain} // vector window sustained.`;
+      return;
+    }
+    if (signal.type === "district" && signal.entering) this.notification = `${signal.district.replace(/-/g, " ").toUpperCase()} // local lattice engaged.`;
+    if (signal.type === "world-event") {
+      this.eventIntensity = signal.intensity;
+      if (signal.id && signal.intensity > 0) this.notification = `${signal.label} // live.`;
+    }
   }
 
   private setShowcase(value: boolean): void {
@@ -256,6 +290,9 @@ export class GameWorld {
       challenge: this.challenge.readout(),
       progression: this.progression.readout(),
       settings: this.settings,
+      sectors: this.sectors,
+      diagnostics: this.telemetry.snapshot,
+      diagnosticsVisible: this.diagnosticsVisible,
     };
     window.dispatchEvent(new CustomEvent<GameStatus>("megapolis:status", { detail: status }));
   }
@@ -294,6 +331,7 @@ export class GameWorld {
     listen<boolean>("megapolis:showcase", (value) => this.setShowcase(value));
     listen<GameplaySettings>("megapolis:settings", (value) => this.setSettings(value));
     listen<boolean>("megapolis:contrast", (value) => this.setContrast(value));
+    listen<boolean>("megapolis:diagnostics", (value) => { this.diagnosticsVisible = value; this.notification = value ? "Telemetry lattice visible." : "Telemetry lattice hidden."; this.publishStatus(true); });
     listen("megapolis:pause", () => this.togglePause());
     listen("megapolis:restart", () => this.restart());
   }

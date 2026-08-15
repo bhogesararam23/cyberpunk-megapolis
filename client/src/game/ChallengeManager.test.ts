@@ -36,6 +36,7 @@ describe("Skyrail Circuit", () => {
     expect(readout.node).toBe(5);
     expect(readout.elapsed).toBe(6.3);
     expect(readout.best).toBe(6.3);
+    expect(readout.medal).toBe("kinetic");
   });
 
   it("does not advance when the player remains outside the active node radius", () => {

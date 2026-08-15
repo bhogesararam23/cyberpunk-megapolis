@@ -1,6 +1,7 @@
 // Aerial Transit Noir — pooled transit, drone, and reactive city motion stays lightweight at any quality preset.
 import { Color3, Mesh, MeshBuilder, StandardMaterial, TransformNode, Vector3 } from "@babylonjs/core";
 import type { Scene } from "@babylonjs/core";
+import type { SectorReadout } from "./types";
 
 interface TransitActor {
   node: TransformNode;
@@ -31,6 +32,9 @@ export class AmbientCitySystem {
   private enabledDrones = -1;
   private enabledPedestrians = -1;
   private enabledPulses = -1;
+  private sector: SectorReadout | null = null;
+  private eventDistrict: SectorReadout["district"] | null = null;
+  private eventIntensity = 0;
 
   public constructor(private readonly scene: Scene) {
     this.root = new TransformNode("ambient-city-root", scene);
@@ -45,9 +49,24 @@ export class AmbientCitySystem {
     this.density = Math.max(0.2, Math.min(1, value));
   }
 
+  public setSectorContext(sector: SectorReadout): void {
+    this.sector = sector;
+  }
+
+  public setEventContext(district: SectorReadout["district"] | null, intensity: number): void {
+    this.eventDistrict = district;
+    this.eventIntensity = intensity;
+  }
+
+  public get activeActors(): number {
+    return Math.max(0, this.enabledTraffic) + Math.max(0, this.enabledDrones) + Math.max(0, this.enabledPedestrians) + Math.max(0, this.enabledPulses);
+  }
+
   public update(playerPosition: Vector3, speed: number, delta: number): string | null {
     this.time += delta;
-    const activeTraffic = Math.max(3, Math.round(this.traffic.length * this.density));
+    const districtBias = this.sector?.district === "commercial-arcade" ? 1.12 : this.sector?.district === "foundry" ? 0.88 : this.sector?.district === "vertical-market" ? 1.04 : 1;
+    const eventBias = this.eventDistrict === this.sector?.district ? 1 + this.eventIntensity * 0.12 : 1;
+    const activeTraffic = Math.min(this.traffic.length, Math.max(3, Math.round(this.traffic.length * this.density * districtBias * eventBias)));
     this.enabledTraffic = this.applyActivation(this.traffic, activeTraffic, this.enabledTraffic);
     for (let index = 0; index < activeTraffic; index += 1) {
       const actor = this.traffic[index];
@@ -72,9 +91,9 @@ export class AmbientCitySystem {
     }
     for (let index = 0; index < activePulses; index += 1) {
       const pulse = this.pulses[index];
-      const wave = 0.55 + 0.45 * Math.sin(this.time * (0.8 + index * 0.13) + index);
+      const wave = 0.55 + 0.45 * Math.sin(this.time * (0.8 + index * 0.13 + this.eventIntensity * 0.7) + index);
       pulse.scaling.y = 0.72 + wave * 0.44;
-      pulse.visibility = 0.28 + wave * 0.52;
+      pulse.visibility = 0.28 + wave * (0.52 + this.eventIntensity * 0.22);
     }
     for (const prop of this.reactive) {
       prop.cooldown = Math.max(0, prop.cooldown - delta);

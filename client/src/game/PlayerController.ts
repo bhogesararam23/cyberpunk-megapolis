@@ -4,6 +4,7 @@ import {
 } from "@babylonjs/core";
 import type { CameraRig } from "./CameraRig";
 import type { CityBuilder } from "./CityBuilder";
+import type { GameSignalBus } from "./GameSignals";
 import type { Anchor, CharacterId, InputSnapshot, TraversalState } from "./types";
 
 const UP = new Vector3(0, 1, 0);
@@ -42,6 +43,8 @@ export class PlayerController {
   private readonly trimMaterial: StandardMaterial;
   private readonly webMaterial: StandardMaterial;
   private readonly pulseCore: Mesh;
+  private readonly flightRing: Mesh;
+  private readonly jetSignals: Mesh[] = [];
   private readonly vantaMantles: Mesh[] = [];
   private readonly kiteFin: Mesh;
   private trimBase = Color3.FromHexString("#f6a84d");
@@ -54,6 +57,9 @@ export class PlayerController {
   private landingImpact = 0;
   private chain = 0;
   private chainTimer = 0;
+  private signals: GameSignalBus | null = null;
+  private lastTargetId: string | null = null;
+  private retargetCooldown = 0;
 
   public constructor(private readonly scene: import("@babylonjs/core").Scene) {
     this.root = new TransformNode("player-root", scene);
@@ -76,6 +82,20 @@ export class PlayerController {
     this.pulseCore.parent = this.root;
     this.pulseCore.position.set(0, 1.42, 0.23);
     this.pulseCore.material = this.trimMaterial;
+    this.flightRing = MeshBuilder.CreateTorus("avatar-flight-ring", { diameter: 1.65, thickness: 0.08, tessellation: 16 }, scene);
+    this.flightRing.parent = this.root;
+    this.flightRing.position.y = 0.72;
+    this.flightRing.rotation.x = Math.PI / 2;
+    this.flightRing.material = this.trimMaterial;
+    this.flightRing.visibility = 0;
+    for (const x of [-0.26, 0.26]) {
+      const jet = MeshBuilder.CreateCylinder(`avatar-jet-${x}`, { height: 0.42, diameterTop: 0.13, diameterBottom: 0.32, tessellation: 6 }, scene);
+      jet.parent = this.root;
+      jet.position.set(x, -0.68, 0.08);
+      jet.material = this.trimMaterial;
+      jet.visibility = 0.16;
+      this.jetSignals.push(jet);
+    }
     for (const [x, name] of [[-0.58, "vanta-mantle-left"], [0.58, "vanta-mantle-right"]] as const) {
       const mantle = MeshBuilder.CreateBox(name, { width: 0.24, height: 0.52, depth: 0.52 }, scene);
       mantle.parent = this.root;
@@ -124,6 +144,11 @@ export class PlayerController {
     this.trimMaterial.emissiveColor = this.trimBase.clone();
     for (const mantle of this.vantaMantles) mantle.isVisible = vanta;
     this.kiteFin.isVisible = !vanta;
+    this.signals?.emit({ type: "operator", character });
+  }
+
+  public setSignals(signals: GameSignalBus): void {
+    this.signals = signals;
   }
 
   public getTrait(): string {
@@ -148,6 +173,8 @@ export class PlayerController {
     this.swingTension = 0;
     this.zipAnchor = null;
     this.target = null;
+    this.lastTargetId = null;
+    this.retargetCooldown = 0;
     this.chain = 0;
     this.chainTimer = 0;
     this.webLine?.dispose();
@@ -159,6 +186,10 @@ export class PlayerController {
   public update(input: InputSnapshot, camera: CameraRig, city: CityBuilder, delta: number, allowInput: boolean): void {
     this.elapsed += delta;
     this.target = city.findBestAnchor(this.root.position.add(new Vector3(0, 1.1, 0)), camera.getForward(), this.velocity);
+    if (this.target?.id !== this.lastTargetId && this.target) {
+      this.lastTargetId = this.target.id;
+      this.emit("target-acquired");
+    }
     if (!allowInput) {
       this.animatePose(delta);
       this.updateWebVisual();
@@ -166,6 +197,7 @@ export class PlayerController {
     }
     this.jumpBuffer = Math.max(0, this.jumpBuffer - delta);
     this.chainTimer = Math.max(0, this.chainTimer - delta);
+    this.retargetCooldown = Math.max(0, this.retargetCooldown - delta);
     if (this.chainTimer === 0) this.chain = 0;
     this.coyoteTime = Math.max(0, this.coyoteTime - delta);
     this.landingImpact = Math.max(0, this.landingImpact - delta * 2.8);
@@ -177,7 +209,10 @@ export class PlayerController {
       this.jumpBuffer = 0;
       this.coyoteTime = 0;
     }
-    if (input.swingPressed && this.target) this.startSwing(this.target, city, camera);
+    if (input.swingPressed && this.target) {
+      if (this.swingAnchor && this.target.id !== this.swingAnchor.id) this.retargetSwing(this.target, city, camera);
+      else this.startSwing(this.target, city, camera);
+    }
     if (input.zipPressed && this.target) this.startZip(this.target);
     if (!input.swingHeld && this.swingAnchor) {
       this.releaseSwing();
@@ -242,6 +277,7 @@ export class PlayerController {
         this.velocity.addInPlace(secondDirection.scale(3.4 * this.swingTension * delta));
       }
       this.traversal = "swing";
+      this.tryContinuityRetarget(city, camera);
       return;
     }
     if (this.zipAnchor) {
@@ -250,6 +286,7 @@ export class PlayerController {
       if (distance < 3.2) {
         this.zipAnchor = null;
         this.traversal = "fall";
+        this.emit("chain");
       } else {
         const targetSpeed = Math.min(58, 26 + distance * 0.46);
         const characterSpeed = this.selected === "kite" ? 1.14 : 1;
@@ -271,6 +308,7 @@ export class PlayerController {
         this.jumpBuffer = 0;
         this.traversal = "jump";
         this.registerChain();
+        this.emit("wall-kick");
         return;
       }
       this.velocity = Vector3.Lerp(this.velocity, direction.scale(18.2), Math.min(1, delta * 7.2));
@@ -330,6 +368,7 @@ export class PlayerController {
       if (wasAirborne && this.velocity.y < -7) {
         this.landingImpact = Math.min(1, Math.abs(this.velocity.y) / 28);
         this.traversal = "landing";
+        this.emit("landed");
       }
       this.velocity.y = 0;
       this.coyoteTime = 0.12;
@@ -348,6 +387,8 @@ export class PlayerController {
     this.swingLength = Math.max(10, distance * (this.getSpeed() > 20 ? 0.94 : 0.88) * tolerance);
     this.swingTension = 0.18;
     this.traversal = "swing";
+    this.retargetCooldown = 0.3;
+    this.emit("web-attached");
   }
 
   private releaseSwing(): void {
@@ -363,6 +404,7 @@ export class PlayerController {
     this.swingTension = 0;
     this.traversal = "fall";
     this.registerChain();
+    this.emit("web-released");
   }
 
   private startZip(anchor: Anchor): void {
@@ -372,6 +414,7 @@ export class PlayerController {
     this.swingTension = 0;
     this.traversal = "zip";
     this.registerChain();
+    this.emit("zip-started");
   }
 
   private updateFacing(): void {
@@ -425,6 +468,14 @@ export class PlayerController {
     const pulse = 0.8 + kinetic * 0.5 + Math.sin(this.elapsed * 9) * 0.08;
     this.pulseCore.scaling.set(1, pulse, 1);
     this.trimMaterial.emissiveColor = this.trimBase.scale(0.68 + kinetic * 0.46);
+    const speedRatio = Math.min(1, this.getSpeed() / 32);
+    this.flightRing.visibility = this.traversal === "idle" ? 0 : 0.08 + kinetic * 0.52;
+    this.flightRing.scaling.set(0.82 + speedRatio * 0.42, 1, 0.82 + speedRatio * 0.42);
+    this.flightRing.rotation.z = this.elapsed * (0.65 + speedRatio * 4.4);
+    this.jetSignals.forEach((jet, index) => {
+      jet.visibility = 0.14 + kinetic * 0.72;
+      jet.scaling.y = 0.7 + kinetic * (0.75 + index * 0.08);
+    });
   }
 
   private updateWebVisual(): void {
@@ -480,5 +531,34 @@ export class PlayerController {
   private registerChain(): void {
     this.chain = Math.min(12, this.chain + 1);
     this.chainTimer = 4.6;
+    this.emit("chain");
+  }
+
+  private tryContinuityRetarget(city: CityBuilder, camera: CameraRig): void {
+    if (!this.swingAnchor || !this.target || this.retargetCooldown > 0 || this.target.id === this.swingAnchor.id || this.getSpeed() < 16 || this.swingTension > 0.78) return;
+    const proposed = city.findSecondaryAnchor(this.root.position, camera.getForward(), this.swingAnchor.id, this.velocity);
+    if (!proposed || proposed.id !== this.target.id) return;
+    const forward = camera.getForward();
+    const direction = proposed.position.subtract(this.root.position).normalize();
+    if (Vector3.Dot(direction, forward) < 0.35) return;
+    this.retargetSwing(proposed, city, camera);
+  }
+
+  private retargetSwing(anchor: Anchor, city: CityBuilder, camera: CameraRig): void {
+    if (!this.swingAnchor || anchor.id === this.swingAnchor.id) return;
+    const outgoing = this.swingAnchor;
+    this.secondarySwingAnchor = outgoing;
+    this.swingAnchor = anchor;
+    const intendedLength = Vector3.Distance(this.getHandPosition(), anchor.position) * (this.selected === "vanta" ? 0.94 : 0.89);
+    this.swingLength = Math.max(9.6, Math.min(this.swingLength * 1.08, intendedLength));
+    this.swingTension = Math.min(0.86, this.swingTension + 0.18);
+    this.retargetCooldown = 0.72;
+    this.registerChain();
+    this.emit("web-attached");
+    this.secondarySwingAnchor = city.findSecondaryAnchor(this.root.position, camera.getForward(), anchor.id, this.velocity) ?? outgoing;
+  }
+
+  private emit(action: "target-acquired" | "web-attached" | "web-released" | "zip-started" | "wall-kick" | "landed" | "chain"): void {
+    this.signals?.emit({ type: "traversal", action, state: this.traversal, speed: this.getSpeed(), chain: this.chain });
   }
 }

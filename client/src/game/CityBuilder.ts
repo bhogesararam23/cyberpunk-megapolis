@@ -2,7 +2,7 @@
 import {
   Color3, Matrix, Mesh, MeshBuilder, Quaternion, StandardMaterial, Texture, TransformNode, Vector3,
 } from "@babylonjs/core";
-import type { Aabb, Anchor } from "./types";
+import type { Aabb, Anchor, DistrictId } from "./types";
 
 const CYAN = Color3.FromHexString("#43f6e8");
 const AMBER = Color3.FromHexString("#f6a84d");
@@ -21,8 +21,10 @@ export class CityBuilder {
   private readonly amberLight: StandardMaterial;
   private readonly facade: StandardMaterial;
   private readonly signDecal: StandardMaterial;
+  private readonly transitDecal: StandardMaterial;
   private readonly transitMovers: Array<{ mesh: Mesh; start: Vector3; end: Vector3; speed: number; phase: number }> = [];
   private readonly signalBeacons: Mesh[] = [];
+  private readonly districtActuators: Array<{ mesh: Mesh; district: DistrictId; baseScale: number }> = [];
   private elapsed = 0;
 
   public constructor(private readonly scene: import("@babylonjs/core").Scene) {
@@ -46,6 +48,11 @@ export class CityBuilder {
     this.signDecal.diffuseTexture = signAtlas;
     this.signDecal.emissiveTexture = signAtlas;
     this.signDecal.emissiveColor = Color3.FromHexString("#2a7f87");
+    this.transitDecal = this.material("vnext-transit-wayfinding", Color3.FromHexString("#163947"), CYAN.scale(0.9));
+    const transitAtlas = new Texture("/manus-storage/vnext-transit-signage-atlas_414d8bd0.png", scene);
+    this.transitDecal.diffuseTexture = transitAtlas;
+    this.transitDecal.emissiveTexture = transitAtlas;
+    this.transitDecal.emissiveColor = Color3.FromHexString("#1e7380");
   }
 
   public build(): void {
@@ -55,6 +62,7 @@ export class CityBuilder {
     this.createTransitNetwork();
     this.createDistantLandmarks();
     this.createCivicLandmarks();
+    this.createVNextWayfinding();
     this.createSkylinePerimeter();
   }
 
@@ -71,6 +79,14 @@ export class CityBuilder {
     for (const beacon of this.signalBeacons) {
       const pulse = 0.9 + Math.sin(this.elapsed * 3.5 + beacon.position.x * 0.06) * 0.1;
       beacon.scaling.y = pulse;
+    }
+  }
+
+  public setDistrictEvent(district: DistrictId | null, intensity: number): void {
+    for (const actuator of this.districtActuators) {
+      const target = actuator.district === district ? actuator.baseScale * (1 + intensity * 0.3) : actuator.baseScale;
+      actuator.mesh.scaling.y += (target - actuator.mesh.scaling.y) * 0.15;
+      actuator.mesh.visibility = actuator.district === district ? 0.72 + intensity * 0.28 : 0.5;
     }
   }
 
@@ -417,6 +433,28 @@ export class CityBuilder {
       beacon.parent = this.root;
       this.signalBeacons.push(beacon);
       this.anchors.push({ id: `signal-${x}-${z}`, position: beacon.position.add(new Vector3(0, 3.5, 0)), kind: "spire" });
+    }
+  }
+
+  private createVNextWayfinding(): void {
+    const districts: Array<[DistrictId, Vector3, number]> = [
+      ["commercial-arcade", new Vector3(53, 13.8, -63.7), 0],
+      ["foundry", new Vector3(-84, 16.3, 80.7), Math.PI],
+      ["vertical-market", new Vector3(37, 20.5, 93.7), 0],
+      ["civic-core", new Vector3(-31.5, 26, -49.4), 0],
+    ];
+    for (const [district, position, rotation] of districts) {
+      const sign = MeshBuilder.CreatePlane(`vnext-wayfinding-${district}`, { width: 6.2, height: 3.5 }, this.scene);
+      sign.position.copyFrom(position);
+      sign.rotation.y = rotation;
+      sign.material = this.transitDecal;
+      sign.parent = this.root;
+      this.districtActuators.push({ mesh: sign, district, baseScale: 1 });
+      const mast = MeshBuilder.CreateBox(`vnext-district-beacon-${district}`, { width: 0.44, height: 4.6, depth: 0.44 }, this.scene);
+      mast.position = position.add(new Vector3(0, -3.8, 0));
+      mast.material = district === "foundry" ? this.amberLight : this.cyanLight;
+      mast.parent = this.root;
+      this.districtActuators.push({ mesh: mast, district, baseScale: 1 });
     }
   }
 

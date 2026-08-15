@@ -8,6 +8,7 @@ export type QualityPreset = "high" | "medium" | "low";
 export type CharacterId = "vanta" | "kite";
 export type WeatherMode = "clear" | "rain" | "storm";
 export type ChallengeState = "idle" | "active" | "complete";
+export type DistrictId = "commercial-arcade" | "foundry" | "vertical-market" | "civic-core";
 
 export interface Aabb {
   min: Vector3;
@@ -28,6 +29,7 @@ export interface ChallengeReadout {
   target: string;
   elapsed: number;
   best: number | null;
+  medal: "signal" | "vector" | "kinetic" | null;
 }
 
 export interface ProgressReadout {
@@ -38,6 +40,27 @@ export interface ProgressReadout {
   record: number;
   nextLandmark: string;
   district: string;
+}
+
+export interface SectorReadout {
+  district: DistrictId;
+  districtLabel: string;
+  active: DistrictId[];
+  predicted: DistrictId[];
+}
+
+export interface DiagnosticReadout {
+  fps: number;
+  frameMs: number;
+  drawCalls: number;
+  triangles: number;
+  activeMeshes: number;
+  activeActors: number;
+  activeSectors: number;
+  district: DistrictId;
+  traversal: TraversalState;
+  speed: number;
+  target: string;
 }
 
 export interface GameStatus {
@@ -60,6 +83,9 @@ export interface GameStatus {
   challenge: ChallengeReadout;
   progression: ProgressReadout;
   settings: GameplaySettings;
+  sectors: SectorReadout;
+  diagnostics: DiagnosticReadout;
+  diagnosticsVisible: boolean;
 }
 
 export interface InputSnapshot {
