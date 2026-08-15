@@ -21,6 +21,7 @@ export class GameWorld {
   private transitionRemaining = 0;
   private demoClock = 0;
   private readonly listeners: Array<() => void> = [];
+  private readonly timers: number[] = [];
   private lastStatusAt = 0;
   private readonly demo: boolean;
   private weatherMode: WeatherMode = "rain";
@@ -40,20 +41,20 @@ export class GameWorld {
     this.challenge = new ChallengeManager(scene);
     this.weather.setDensity(this.quality.effectDensity);
     this.bindEvents();
-    window.setTimeout(() => {
+    this.timers.push(window.setTimeout(() => {
       if (this.phase !== "loading") return;
       this.phase = "selection";
       this.notification = "Select an operator. Traverse when ready.";
       this.publishStatus(true);
       if (this.demo) {
-        window.setTimeout(() => {
+        this.timers.push(window.setTimeout(() => {
           if (this.phase !== "selection") return;
           this.phase = "playing";
           this.notification = "Autopilot route live. Anchor network engaged.";
           this.publishStatus(true);
-        }, 80);
+        }, 80));
       }
-    }, 700);
+    }, 700));
   }
 
   public update(delta: number): void {
@@ -108,6 +109,8 @@ export class GameWorld {
   }
 
   public dispose(): void {
+    for (const timer of this.timers) window.clearTimeout(timer);
+    this.timers.length = 0;
     for (const unbind of this.listeners) unbind();
     this.input.dispose();
     this.player.dispose();
