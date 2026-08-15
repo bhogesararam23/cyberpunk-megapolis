@@ -16,6 +16,7 @@ export class AudioManager {
   private lastTraversal: TraversalState = "idle";
   private atmosphere: AtmosphereProfile | null = null;
   private eventIntensity = 0;
+  private paused = false;
 
   public constructor(settings: GameplaySettings) { this.settings = settings; }
 
@@ -53,9 +54,24 @@ export class AudioManager {
     this.eventIntensity = eventIntensity;
   }
 
+  public setPaused(value: boolean): void {
+    this.paused = value;
+    if (!value || !this.context) return;
+    const now = this.context.currentTime;
+    this.ambientGain?.gain.cancelScheduledValues(now);
+    this.overtoneGain?.gain.cancelScheduledValues(now);
+    this.ambientGain?.gain.setTargetAtTime(0, now, 0.035);
+    this.overtoneGain?.gain.setTargetAtTime(0, now, 0.035);
+  }
+
   public update(speed: number, traversal: TraversalState, weather: WeatherMode, delta: number): void {
     if (!this.enabled || !this.context || !this.ambientGain || !this.ambientOscillator || !this.overtoneGain || !this.overtoneOscillator) return;
     const now = this.context.currentTime;
+    if (this.paused) {
+      this.ambientGain.gain.setTargetAtTime(0, now, 0.035);
+      this.overtoneGain.gain.setTargetAtTime(0, now, 0.035);
+      return;
+    }
     const weatherLift = weather === "storm" ? 0.022 : weather === "rain" ? 0.012 : 0.004;
     const phaseLift = this.atmosphere?.phase === "night" ? 0.012 : this.atmosphere?.phase === "dawn" ? 0.007 : 0.004;
     const level = Math.min(0.1, (weatherLift + phaseLift + this.eventIntensity * 0.012 + Math.min(0.045, speed * 0.0011)) * this.settings.masterVolume * this.settings.ambienceVolume);
@@ -90,7 +106,7 @@ export class AudioManager {
     oscillator.start(now); oscillator.stop(now + duration + 0.03);
   }
 
-  public dispose(): void { this.ambientOscillator?.stop(); this.ambientOscillator?.disconnect(); this.ambientGain?.disconnect(); this.overtoneOscillator?.stop(); this.overtoneOscillator?.disconnect(); this.overtoneGain?.disconnect(); void this.context?.close(); this.context = null; this.ambientGain = null; this.ambientOscillator = null; this.overtoneGain = null; this.overtoneOscillator = null; this.enabled = false; }
+  public dispose(): void { this.ambientOscillator?.stop(); this.ambientOscillator?.disconnect(); this.ambientGain?.disconnect(); this.overtoneOscillator?.stop(); this.overtoneOscillator?.disconnect(); this.overtoneGain?.disconnect(); void this.context?.close(); this.context = null; this.ambientGain = null; this.ambientOscillator = null; this.overtoneGain = null; this.overtoneOscillator = null; this.enabled = false; this.paused = false; }
 }
 
 declare global { interface Window { webkitAudioContext?: typeof AudioContext; } }

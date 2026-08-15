@@ -86,8 +86,10 @@ export class GameWorld {
 
   public update(delta: number): void {
     this.audio.setEnvironment(this.timeOfDay.readout, this.eventIntensity);
-    this.city.update(delta);
-    this.weather.update(this.player.root.position, delta);
+    if (this.shouldAdvanceEnvironment()) {
+      this.city.update(delta);
+      this.weather.update(this.player.root.position, delta);
+    }
     const raw = this.input.snapshot();
     if (this.phase === "selection") {
       if (raw.enterPressed) this.beginTraversal();
@@ -158,6 +160,11 @@ export class GameWorld {
     this.city.dispose();
   }
 
+  /** Scene-owned environment systems must not advance while gameplay is deliberately paused. */
+  public shouldAdvanceEnvironment(): boolean {
+    return this.phase === "transition" || this.phase === "playing" || this.phase === "recovery";
+  }
+
   private beginTraversal(): void {
     if (this.phase !== "selection") return;
     this.input.capturePointer();
@@ -176,11 +183,14 @@ export class GameWorld {
     if (this.phase === "playing") {
       this.phase = "paused";
       this.notification = "Traversal held. Systems standing by.";
+      this.input.reset();
       if (document.pointerLockElement) document.exitPointerLock();
       this.audio.cue("pause");
+      this.audio.setPaused(true);
     } else if (this.phase === "paused") {
       this.phase = "playing";
       this.notification = "Momentum restored.";
+      this.audio.setPaused(false);
       this.input.capturePointer();
     } else return;
     this.publishStatus(true);

@@ -134,10 +134,10 @@ function MenuPanel({ status, onSettings, settings, reducedMotion, highContrast, 
         {status.phase === "transition" && <p className="transition-copy">{status.notification}</p>}
       </div>
       <div className="menu-meta">
-        <button className="settings-trigger" onClick={onSettings}><Settings2 size={15} /> SYSTEM SETTINGS</button>
+        <button className="settings-trigger" aria-expanded={settings} aria-controls="flight-deck-settings" onClick={onSettings}><Settings2 size={15} /> SYSTEM SETTINGS</button>
         <span>QUALITY // {status.quality.toUpperCase()}</span>
       </div>
-      {settings && <SettingsPanel status={status} reducedMotion={reducedMotion} highContrast={highContrast} onMotion={onMotion} onContrast={onContrast} />}
+      {settings && <SettingsPanel status={status} reducedMotion={reducedMotion} highContrast={highContrast} onMotion={onMotion} onContrast={onContrast} onClose={onSettings} />}
     </main>
   );
 }
@@ -153,9 +153,9 @@ function PausePanel({ status, onSettings, settings, reducedMotion, highContrast,
           <button className="launch-button" onClick={() => emit("megapolis:pause")}><Play size={16} fill="currentColor" /> RESUME</button>
           <button className="secondary-button" onClick={() => emit("megapolis:restart")}><RotateCcw size={15} /> RE-ENTER</button>
         </div>
-        <button className="settings-trigger" onClick={onSettings}><Settings2 size={15} /> SETTINGS</button>
+        <button className="settings-trigger" aria-expanded={settings} aria-controls="flight-deck-settings" onClick={onSettings}><Settings2 size={15} /> SETTINGS</button>
       </div>
-      {settings && <SettingsPanel status={status} reducedMotion={reducedMotion} highContrast={highContrast} onMotion={onMotion} onContrast={onContrast} />}
+      {settings && <SettingsPanel status={status} reducedMotion={reducedMotion} highContrast={highContrast} onMotion={onMotion} onContrast={onContrast} onClose={onSettings} />}
     </main>
   );
 }
@@ -169,11 +169,12 @@ function CharacterCard({ id, active, name, label, description }: { id: Character
   </button>;
 }
 
-function SettingsPanel({ status, reducedMotion, highContrast, onMotion, onContrast }: { status: GameStatus; reducedMotion: boolean; highContrast: boolean; onMotion: (value: boolean) => void; onContrast: (value: boolean) => void }) {
+function SettingsPanel({ status, reducedMotion, highContrast, onMotion, onContrast, onClose }: { status: GameStatus; reducedMotion: boolean; highContrast: boolean; onMotion: (value: boolean) => void; onContrast: (value: boolean) => void; onClose: () => void }) {
   const presets: QualityPreset[] = ["high", "medium", "low"];
   const weather: WeatherMode[] = ["clear", "rain", "storm"];
   const update = (value: Partial<GameStatus["settings"]>) => emit("megapolis:settings", { ...status.settings, ...value });
-  return <aside className="settings-card" role="dialog" aria-label="Flight deck settings" tabIndex={-1}>
+  return <aside id="flight-deck-settings" className="settings-card" role="dialog" aria-label="Flight deck settings" tabIndex={-1}>
+    <button className="settings-close" aria-label="Close flight deck settings" onClick={onClose}>CLOSE</button>
     <span className="eyebrow">SYSTEM LATTICE</span>
     <div className="quality-switch" role="group" aria-label="Quality preset">
       {presets.map((preset) => <button key={preset} aria-pressed={status.quality === preset} className={status.quality === preset ? "active" : ""} onClick={() => emit<QualityPreset>("megapolis:quality", preset)}>{preset}</button>)}
@@ -200,8 +201,8 @@ function SettingsPanel({ status, reducedMotion, highContrast, onMotion, onContra
 }
 
 function RangeControl({ label, value, min, max, step, onChange }: { label: string; value: number; min: number; max: number; step: number; onChange: (value: number) => void }) {
-  const suffix = label === "FOV" ? "°" : "%";
-  return <label className="range-control"><span>{label} <b>{Math.round(value * 100)}{suffix}</b></span><input aria-label={`${label} setting`} type="range" min={min} max={max} step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} /></label>;
+  const formatted = label === "FOV" ? `${Math.round(value * 180 / Math.PI)}°` : `${Math.round(value * 100)}%`;
+  return <label className="range-control"><span>{label} <b>{formatted}</b></span><input aria-label={`${label} setting`} type="range" min={min} max={max} step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} /></label>;
 }
 
 function DiagnosticsOverlay({ status }: { status: GameStatus }) {

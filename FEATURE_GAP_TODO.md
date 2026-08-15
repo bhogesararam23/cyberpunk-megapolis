@@ -21,3 +21,12 @@
 - [x] Improve the progression layer, game UI, accessibility, local records, diagnostics, and performance presets as one cohesive player experience. Flight-deck settings now expose an optional mobile-safe developer telemetry panel; status includes district/sector budgets; local challenge records persist per contract and classify signal/vector/kinetic medals.
 - [x] Verify desktop/mobile live gameplay, automated coverage, lifecycle integrity, runtime performance behavior, and address remaining VNext P0/P1 gaps. The restarted live preview renders at desktop and mobile sizes, all 12 headless tests pass, static typing passes, and no VNext P0/P1 gaps remain within the traversal-first static scope.
 - [x] Save the VNext checkpoint and deliver the categorized implementation summary.
+
+## Release QA and Immediate Repair Checklist
+
+- [x] Build a concrete QA matrix covering assets, lifecycle transitions, runtime requests/errors, input, resize, visibility changes, and cleanup. See `RELEASE_QA_MATRIX.md` for the execution and acceptance matrix.
+- [x] Complete the bootstrap, asset, runtime-error, and lifecycle repair gate. All six managed visual assets resolve; focus, visibility, pointer-lock, pause, and ambience behavior now reset or freeze safely; the calibrated glow curve preserves route readability in the live demo.
+- [x] Run and repair traversal, targeting, collision, numerical stability, camera, and character motion stress tests across the supported districts. Added deterministic extreme-momentum, long-zip, and rapid chase-camera regression cases; all finite-state, collision, and bounded-velocity checks pass.
+- [x] Audit and repair world activation, visual atmosphere, audio, UI, persistence, and accessibility using the live browser build. Weather pooling and sector budgets remain bounded; settings now recover safely from malformed storage, expose accurate FOV degrees, publish expanded state, offer a touch-safe close action, and retain keyboard-visible focus treatment; the mobile launch presentation remains readable.
+- [x] Run the full regression suite, focused lifecycle tests, responsive visual checks, and console/network review; resolve every reproducible issue. The post-repair suite passes 19 tests in 9 files, the current preview has no application runtime/resource failures, and desktop/mobile launch checks pass.
+- [x] Save the repaired release candidate and deliver a categorized QA report with known environment-only limitations.

@@ -63,4 +63,35 @@ describe("player traversal smoke path", () => {
     expect(player.traversal).toBe("fall");
     expect(player.getSpeed()).toBeGreaterThan(1);
   });
+
+  it("keeps extreme airborne input finite and restores a bounded horizontal velocity", () => {
+    const { city, player } = createTraversal();
+    player.root.position.set(0, 34, 0);
+    player.grounded = false;
+    player.velocity.set(360, -120, 300);
+
+    for (let frame = 0; frame < 90; frame += 1) {
+      player.update({ ...idle, moveX: 1, moveY: 1, diveHeld: frame < 12 }, camera, city, 1 / 60, true);
+    }
+
+    expect([player.root.position.x, player.root.position.y, player.root.position.z, player.velocity.x, player.velocity.y, player.velocity.z].every(Number.isFinite)).toBe(true);
+    expect(player.getSpeed()).toBeLessThanOrEqual(32.1);
+    expect(player.root.position.y).toBeGreaterThanOrEqual(-24);
+  });
+
+  it("keeps a long zip bounded before recovering into a normal traversal state", () => {
+    const { city, player } = createTraversal();
+    player.root.position.set(0, 8, 0);
+    player.grounded = false;
+    player.velocity.set(12, 0, 20);
+    player.update(idle, camera, city, 1 / 60, true);
+    expect(player.target).not.toBeNull();
+
+    player.update({ ...idle, zipPressed: true }, camera, city, 1 / 60, true);
+    for (let frame = 0; frame < 180; frame += 1) player.update(idle, camera, city, 1 / 60, true);
+
+    expect([player.root.position.x, player.root.position.y, player.root.position.z, player.velocity.x, player.velocity.y, player.velocity.z].every(Number.isFinite)).toBe(true);
+    expect(player.velocity.length()).toBeLessThanOrEqual(60.1);
+    expect(["zip", "fall", "landing", "idle", "run", "sprint", "jump"]).toContain(player.traversal);
+  });
 });

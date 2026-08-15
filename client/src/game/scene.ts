@@ -50,7 +50,7 @@ export async function createGameScene(engine: Engine, canvas: HTMLCanvasElement)
   scene.onBeforeRenderObservable.add(() => {
     const rawDelta = scene.getEngine().getDeltaTime() / 1000;
     const delta = Math.min(0.05, Math.max(0.001, rawDelta));
-    timeOfDay.update(delta, weather.currentMode);
+    if (world.shouldAdvanceEnvironment()) timeOfDay.update(delta, weather.currentMode);
     world.update(delta);
   });
   return {

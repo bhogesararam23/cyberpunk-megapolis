@@ -37,6 +37,13 @@ export class InputManager {
       this.lookY += event.movementY;
     }
   };
+  private readonly onWindowBlur = () => this.reset();
+  private readonly onVisibilityChange = () => {
+    if (document.visibilityState !== "visible") this.reset();
+  };
+  private readonly onPointerLockChange = () => {
+    if (document.pointerLockElement !== this.canvas) this.reset();
+  };
   private readonly onContextMenu = (event: MouseEvent) => event.preventDefault();
 
   public constructor(private readonly canvas: HTMLCanvasElement) {
@@ -45,6 +52,9 @@ export class InputManager {
     canvas.addEventListener("pointerdown", this.onPointerDown);
     window.addEventListener("pointerup", this.onPointerUp);
     window.addEventListener("pointermove", this.onPointerMove);
+    window.addEventListener("blur", this.onWindowBlur);
+    document.addEventListener("visibilitychange", this.onVisibilityChange);
+    document.addEventListener("pointerlockchange", this.onPointerLockChange);
     canvas.addEventListener("contextmenu", this.onContextMenu);
   }
 
@@ -73,6 +83,14 @@ export class InputManager {
     this.lookY = 0;
   }
 
+  /** Clears held and one-frame actions after pause, focus loss, or pointer-lock loss. */
+  public reset(): void {
+    this.held.clear();
+    this.pressed.clear();
+    this.lookX = 0;
+    this.lookY = 0;
+  }
+
   public capturePointer(): void {
     this.canvas.focus();
     try {
@@ -89,7 +107,11 @@ export class InputManager {
     this.canvas.removeEventListener("pointerdown", this.onPointerDown);
     window.removeEventListener("pointerup", this.onPointerUp);
     window.removeEventListener("pointermove", this.onPointerMove);
+    window.removeEventListener("blur", this.onWindowBlur);
+    document.removeEventListener("visibilitychange", this.onVisibilityChange);
+    document.removeEventListener("pointerlockchange", this.onPointerLockChange);
     this.canvas.removeEventListener("contextmenu", this.onContextMenu);
+    this.reset();
     if (document.pointerLockElement === this.canvas) document.exitPointerLock();
   }
 
