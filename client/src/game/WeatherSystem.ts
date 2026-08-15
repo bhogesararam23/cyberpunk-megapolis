@@ -48,6 +48,10 @@ export class WeatherSystem {
     this.density = Math.min(1, Math.max(0.1, density));
   }
 
+  public get currentMode(): WeatherMode {
+    return this.mode;
+  }
+
   public get activeDropCount(): number {
     return Math.max(1, Math.floor(this.drops.length * this.density));
   }

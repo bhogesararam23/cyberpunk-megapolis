@@ -1,14 +1,16 @@
+// Aerial Transit Noir — multi-route traversal contracts turn city knowledge into repeatable flight lines.
 import { Color3, Mesh, MeshBuilder, Scene, StandardMaterial, TransformNode, Vector3 } from "@babylonjs/core";
 import type { ChallengeReadout } from "./types";
 
-const ROUTE_ID = "SKYRAIL_CIRCUIT";
 const BEST_KEY = "cyberpunk-megapolis.skyrail-circuit.best";
 
-interface RouteNode {
-  label: string;
-  position: Vector3;
-  marker: Mesh;
-}
+const ROUTES: Array<{ label: string; nodes: Array<[string, Vector3]> }> = [
+  { label: "SKYRAIL CIRCUIT", nodes: [["STREET LAUNCH", new Vector3(0, 4.8, 22)], ["SIGNAL PYLON", new Vector3(14, 31, -78)], ["CIVIC CROWN", new Vector3(-32, 50, -38)], ["NORTH RAIL", new Vector3(-38, 19, 82)], ["SKYLINE EXIT", new Vector3(82, 31, 20)]] },
+  { label: "MARKET DROP", nodes: [["MARKET GATE", new Vector3(32, 12, 94)], ["STACKED WALK", new Vector3(45, 23, 100)], ["GLASS BRIDGE", new Vector3(59, 28, 64)], ["ARCADE PORTAL", new Vector3(57, 12, -59)], ["CANAL EXIT", new Vector3(86, 11, 18)]] },
+  { label: "FOUNDRY ELEVATION", nodes: [["FOUNDRY FLOOR", new Vector3(-85, 7, 76)], ["VENT ARRAY", new Vector3(-83, 16, 78)], ["CATWALK BEND", new Vector3(-69, 25, 52)], ["RAIL JUNCTION", new Vector3(-38, 23, 82)], ["CROWN RETURN", new Vector3(-32, 50, -38)]] },
+];
+
+interface RouteNode { label: string; position: Vector3; marker: Mesh; }
 
 export class ChallengeManager {
   private readonly root: TransformNode;
@@ -21,6 +23,7 @@ export class ChallengeManager {
   private running = false;
   private completed = false;
   private bestTime: number | null;
+  private routeIndex = 0;
 
   public constructor(private readonly scene: Scene) {
     this.root = new TransformNode("challenge-root", scene);
@@ -28,26 +31,17 @@ export class ChallengeManager {
     this.idleMaterial = this.makeMaterial("challenge-idle", "#223141", "#28505c");
     this.completeMaterial = this.makeMaterial("challenge-complete", "#503619", "#f6a84d");
     this.bestTime = this.loadBest();
-    const route: Array<[string, Vector3]> = [
-      ["STREET LAUNCH", new Vector3(0, 4.8, 22)],
-      ["SIGNAL PYLON", new Vector3(14, 31, -78)],
-      ["CIVIC CROWN", new Vector3(-32, 50, -38)],
-      ["NORTH RAIL", new Vector3(-38, 19, 82)],
-      ["SKYLINE EXIT", new Vector3(82, 31, 20)],
-    ];
-    for (const [label, position] of route) this.nodes.push({ label, position, marker: this.createMarker(label, position) });
+    this.populateRoute();
     this.refreshMarkers();
   }
 
-  public start(): void {
-    this.nodeIndex = 0;
-    this.elapsed = 0;
-    this.running = true;
-    this.completed = false;
-    this.refreshMarkers();
-  }
+  public start(): void { this.nodeIndex = 0; this.elapsed = 0; this.running = true; this.completed = false; this.refreshMarkers(); }
+  public reset(): void { this.start(); }
 
-  public reset(): void {
+  public nextRoute(): void {
+    this.routeIndex = (this.routeIndex + 1) % ROUTES.length;
+    while (this.nodes.length) this.nodes.pop()?.marker.dispose();
+    this.populateRoute();
     this.start();
   }
 
@@ -65,10 +59,7 @@ export class ChallengeManager {
     if (this.nodeIndex >= this.nodes.length) {
       this.running = false;
       this.completed = true;
-      if (this.bestTime === null || this.elapsed < this.bestTime) {
-        this.bestTime = this.elapsed;
-        this.saveBest(this.elapsed);
-      }
+      if (this.bestTime === null || this.elapsed < this.bestTime) { this.bestTime = this.elapsed; this.saveBest(this.elapsed); }
     }
     this.refreshMarkers();
     return true;
@@ -76,34 +67,23 @@ export class ChallengeManager {
 
   public readout(): ChallengeReadout {
     const active = this.nodes[Math.min(this.nodeIndex, this.nodes.length - 1)];
-    return {
-      route: "SKYRAIL CIRCUIT",
-      state: this.completed ? "complete" : this.running ? "active" : "idle",
-      node: Math.min(this.nodeIndex + 1, this.nodes.length),
-      total: this.nodes.length,
-      target: active?.label ?? "CIRCUIT CLEAR",
-      elapsed: Math.round(this.elapsed * 10) / 10,
-      best: this.bestTime === null ? null : Math.round(this.bestTime * 10) / 10,
-    };
+    return { route: ROUTES[this.routeIndex].label, state: this.completed ? "complete" : this.running ? "active" : "idle", node: Math.min(this.nodeIndex + 1, this.nodes.length), total: this.nodes.length, target: active?.label ?? "CIRCUIT CLEAR", elapsed: Math.round(this.elapsed * 10) / 10, best: this.bestTime === null ? null : Math.round(this.bestTime * 10) / 10 };
   }
 
-  public getActivePosition(): Vector3 | null {
-    return this.nodes[this.nodeIndex]?.position.clone() ?? null;
-  }
+  public getActivePosition(): Vector3 | null { return this.nodes[this.nodeIndex]?.position.clone() ?? null; }
 
   public dispose(): void {
     this.root.dispose(false, true);
-    this.activeMaterial.dispose();
-    this.idleMaterial.dispose();
-    this.completeMaterial.dispose();
+    this.activeMaterial.dispose(); this.idleMaterial.dispose(); this.completeMaterial.dispose();
+  }
+
+  private populateRoute(): void {
+    for (const [label, position] of ROUTES[this.routeIndex].nodes) this.nodes.push({ label, position, marker: this.createMarker(label, position) });
   }
 
   private createMarker(name: string, position: Vector3): Mesh {
     const marker = MeshBuilder.CreateTorus(`route-node-${name}`, { diameter: 5.2, thickness: 0.24, tessellation: 12 }, this.scene);
-    marker.position.copyFrom(position);
-    marker.rotation.x = Math.PI / 2;
-    marker.parent = this.root;
-    marker.isPickable = false;
+    marker.position.copyFrom(position); marker.rotation.x = Math.PI / 2; marker.parent = this.root; marker.isPickable = false;
     return marker;
   }
 
@@ -117,26 +97,10 @@ export class ChallengeManager {
 
   private makeMaterial(name: string, diffuse: string, emissive: string): StandardMaterial {
     const material = new StandardMaterial(name, this.scene);
-    material.diffuseColor = Color3.FromHexString(diffuse);
-    material.emissiveColor = Color3.FromHexString(emissive);
-    material.specularColor = Color3.Black();
+    material.diffuseColor = Color3.FromHexString(diffuse); material.emissiveColor = Color3.FromHexString(emissive); material.specularColor = Color3.Black();
     return material;
   }
 
-  private loadBest(): number | null {
-    try {
-      const value = window.localStorage.getItem(BEST_KEY);
-      return value === null || Number.isNaN(Number(value)) ? null : Number(value);
-    } catch {
-      return null;
-    }
-  }
-
-  private saveBest(value: number): void {
-    try {
-      window.localStorage.setItem(BEST_KEY, String(value));
-    } catch {
-      // Storage access is optional; the active session remains playable when it is unavailable.
-    }
-  }
+  private loadBest(): number | null { try { const value = window.localStorage.getItem(BEST_KEY); return value === null || Number.isNaN(Number(value)) ? null : Number(value); } catch { return null; } }
+  private saveBest(value: number): void { try { window.localStorage.setItem(BEST_KEY, String(value)); } catch { /* storage is optional */ } }
 }

@@ -1,5 +1,6 @@
 // Aerial Transit Noir — shared gameplay vocabulary keeps Signal Cyan actions explicit.
 import type { Vector3 } from "@babylonjs/core";
+import type { GameplaySettings } from "./SettingsStore";
 
 export type GamePhase = "loading" | "selection" | "transition" | "playing" | "paused" | "recovery" | "error";
 export type TraversalState = "idle" | "run" | "sprint" | "jump" | "fall" | "swing" | "zip" | "wall-run" | "dive" | "landing" | "recovery";
@@ -29,14 +30,27 @@ export interface ChallengeReadout {
   best: number | null;
 }
 
+export interface ProgressReadout {
+  discoveries: number;
+  discoveryTotal: number;
+  credits: number;
+  distance: number;
+  record: number;
+  nextLandmark: string;
+  district: string;
+}
+
 export interface GameStatus {
   phase: GamePhase;
   character: CharacterId;
+  characterTrait: string;
   traversal: TraversalState;
   speed: number;
   momentum: number;
+  chain: number;
   target: string;
   targetDistance: number;
+  anchorCue: "scanning" | "ready" | "boost";
   quality: QualityPreset;
   fps: number;
   notification: string;
@@ -44,6 +58,8 @@ export interface GameStatus {
   weather: WeatherMode;
   showcase: boolean;
   challenge: ChallengeReadout;
+  progression: ProgressReadout;
+  settings: GameplaySettings;
 }
 
 export interface InputSnapshot {

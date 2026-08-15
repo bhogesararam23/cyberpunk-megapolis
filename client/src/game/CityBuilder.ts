@@ -51,6 +51,7 @@ export class CityBuilder {
   public build(): void {
     this.createGroundAndRoads();
     this.createCityBlocks();
+    this.createDistrictRoutes();
     this.createTransitNetwork();
     this.createDistantLandmarks();
     this.createCivicLandmarks();
@@ -276,6 +277,86 @@ export class CityBuilder {
     }
     this.createTransitMover("northbound-train", points[0], points[4], 0.054, 0.12);
     this.createTransitMover("southbound-train", points[9], points[5], 0.048, 0.57);
+  }
+
+  private createDistrictRoutes(): void {
+    this.createCommercialArcade();
+    this.createFoundryTerraces();
+    this.createVerticalMarket();
+    const corridorMaterial = this.material("route-catwalk", Color3.FromHexString("#203a4d"), Color3.FromHexString("#174c55"));
+    const corridors: Array<[string, number, number, number, number, number]> = [
+      ["arcade-span", 58, 19, -45, 45, 5.8],
+      ["foundry-span", -76, 17, 44, 58, 5.4],
+      ["market-span", 30, 14, 85, 64, 4.8],
+      ["crosswind-link", 6, 22, 18, 98, 4.4],
+    ];
+    for (const [name, x, y, z, width, depth] of corridors) {
+      const deck = MeshBuilder.CreateBox(name, { width, height: 0.75, depth }, this.scene);
+      deck.position.set(x, y, z);
+      deck.material = corridorMaterial;
+      deck.parent = this.root;
+      this.collisions.push({ min: deck.position.subtract(new Vector3(width / 2, 0.38, depth / 2)), max: deck.position.add(new Vector3(width / 2, 0.38, depth / 2)) });
+      this.anchors.push({ id: `route-${name}`, position: deck.position.add(new Vector3(0, 4.5, 0)), kind: "bridge" });
+      const beacon = MeshBuilder.CreateBox(`${name}-beacon`, { width: 0.34, height: 2.6, depth: 0.34 }, this.scene);
+      beacon.position.copyFrom(deck.position.add(new Vector3(-width * 0.32, 1.65, 0)));
+      beacon.material = this.cyanLight;
+      beacon.parent = this.root;
+      this.signalBeacons.push(beacon);
+    }
+  }
+
+  private createCommercialArcade(): void {
+    const canopyMaterial = this.material("arcade-canopy", Color3.FromHexString("#25324a"), Color3.FromHexString("#163f58"));
+    for (let index = 0; index < 7; index += 1) {
+      const x = 32 + index * 8;
+      const canopy = MeshBuilder.CreateBox(`commercial-canopy-${index}`, { width: 6.3, height: 0.54, depth: 11 }, this.scene);
+      canopy.position.set(x, 7.3 + (index % 2) * 1.4, -58);
+      canopy.material = canopyMaterial;
+      canopy.parent = this.root;
+      const holo = MeshBuilder.CreatePlane(`commercial-holo-${index}`, { width: 4.8, height: 2.4 }, this.scene);
+      holo.position.set(x, canopy.position.y + 2.1, -63.54);
+      holo.material = index % 3 === 0 ? this.amberLight : this.signDecal;
+      holo.parent = this.root;
+      if (index % 2 === 0) this.anchors.push({ id: `arcade-${index}`, position: canopy.position.add(new Vector3(0, 5.5, 0)), kind: "roof" });
+    }
+  }
+
+  private createFoundryTerraces(): void {
+    const steel = this.material("foundry-steel", Color3.FromHexString("#273039"), Color3.FromHexString("#392e21"));
+    for (let index = 0; index < 6; index += 1) {
+      const x = -105 + index * 11;
+      const y = 5 + index * 3.2;
+      const terrace = MeshBuilder.CreateBox(`foundry-terrace-${index}`, { width: 9.5, height: 0.9, depth: 17 }, this.scene);
+      terrace.position.set(x, y, 73);
+      terrace.material = steel;
+      terrace.parent = this.root;
+      this.collisions.push({ min: terrace.position.subtract(new Vector3(4.75, 0.45, 8.5)), max: terrace.position.add(new Vector3(4.75, 0.45, 8.5)) });
+      const vent = MeshBuilder.CreateCylinder(`foundry-vent-${index}`, { height: 6 + (index % 3) * 2, diameter: 2.8, tessellation: 8 }, this.scene);
+      vent.position.set(x + 2.3, y + 3.1, 78);
+      vent.material = index % 2 ? this.amberLight : this.slate;
+      vent.parent = this.root;
+      this.anchors.push({ id: `foundry-${index}`, position: terrace.position.add(new Vector3(0, 5, 0)), kind: "roof" });
+    }
+  }
+
+  private createVerticalMarket(): void {
+    const scaffoldMaterial = this.material("market-scaffold", Color3.FromHexString("#1c3345"), Color3.FromHexString("#134253"));
+    for (let level = 0; level < 5; level += 1) {
+      const y = 5 + level * 5.2;
+      const deck = MeshBuilder.CreateBox(`market-walkway-${level}`, { width: 42 - level * 3, height: 0.7, depth: 6.2 }, this.scene);
+      deck.position.set(37 + (level % 2 ? 3 : -3), y, 101 - level * 4);
+      deck.material = scaffoldMaterial;
+      deck.parent = this.root;
+      this.collisions.push({ min: deck.position.subtract(new Vector3((42 - level * 3) / 2, 0.35, 3.1)), max: deck.position.add(new Vector3((42 - level * 3) / 2, 0.35, 3.1)) });
+      this.anchors.push({ id: `market-walkway-${level}`, position: deck.position.add(new Vector3(0, 4.3, 0)), kind: "bridge" });
+      for (const side of [-1, 1]) {
+        const stall = MeshBuilder.CreateBox(`market-stall-${level}-${side}`, { width: 5.5, height: 4.4, depth: 5.2 }, this.scene);
+        stall.position.set(deck.position.x + side * (14 - level), y + 2.5, deck.position.z + side * 1.8);
+        stall.material = (level + side) % 2 === 0 ? this.facade : this.concrete;
+        stall.parent = this.root;
+        this.createSign(stall.position.x, stall.position.y + 1.1, stall.position.z - 2.7, 3.8, side > 0);
+      }
+    }
   }
 
   private createDistantLandmarks(): void {

@@ -7,11 +7,13 @@ const reference = "/manus-storage/cyberpunk-megapolis-reference_708450ea.png";
 const emblem = "/manus-storage/megapolis-emblem_cdc84c90.png";
 
 const initial: GameStatus = {
-  phase: "loading", character: "vanta", traversal: "idle", speed: 0, momentum: 0,
-  target: "SCANNING", targetDistance: 0, quality: "high", fps: 0,
+  phase: "loading", character: "vanta", characterTrait: "KINETIC WEAVE // longer line tolerance and stronger release momentum", traversal: "idle", speed: 0, momentum: 0, chain: 0,
+  target: "SCANNING", targetDistance: 0, anchorCue: "scanning", quality: "high", fps: 0,
   notification: "Booting city lattice…", menuHint: "WASD move · Space jump · LMB swing · RMB zip · Q wall-run · E dive",
   weather: "rain", showcase: false,
   challenge: { route: "SKYRAIL CIRCUIT", state: "idle", node: 1, total: 5, target: "STREET LAUNCH", elapsed: 0, best: null },
+  progression: { discoveries: 0, discoveryTotal: 6, credits: 0, distance: 0, record: 0, nextLandmark: "SPECTRUM PORTAL", district: "COMMERCIAL ARCADE" },
+  settings: { masterVolume: 0.7, sfxVolume: 0.82, ambienceVolume: 0.34, sensitivity: 1, fov: 0.96, invertY: false, screenShake: true, reducedMotion: false, highContrast: false },
 };
 
 function emit<T>(name: string, detail?: T): void {
@@ -29,6 +31,19 @@ export default function GameHUD() {
     window.addEventListener("megapolis:status", update);
     return () => window.removeEventListener("megapolis:status", update);
   }, []);
+
+  useEffect(() => {
+    setReducedMotion(status.settings.reducedMotion);
+    setHighContrast(status.settings.highContrast);
+  }, [status.settings.reducedMotion, status.settings.highContrast]);
+
+  useEffect(() => {
+    const closeSettings = (event: KeyboardEvent) => {
+      if (settings && event.key === "Escape") setSettings(false);
+    };
+    window.addEventListener("keydown", closeSettings);
+    return () => window.removeEventListener("keydown", closeSettings);
+  }, [settings]);
 
   const inMenu = status.phase === "loading" || status.phase === "selection" || status.phase === "transition";
   const paused = status.phase === "paused";
@@ -63,19 +78,21 @@ export default function GameHUD() {
           <section className="target-readout">
             <span className="eyebrow"><MousePointer2 size={13} /> TARGET VECTOR</span>
             <strong className={status.target === "SCANNING" ? "scanning" : "locked"}>{status.target}</strong>
+            <span className="anchor-cue">{status.anchorCue === "boost" ? "MOMENTUM WINDOW // HOT" : status.anchorCue === "ready" ? "ANCHOR WINDOW // READY" : "ANCHOR WINDOW // SWEEP"}</span>
             <span>{status.targetDistance ? `${status.targetDistance}m // unblocked path` : "sweep city geometry"}</span>
           </section>
           <section className="velocity-panel">
             <span className="eyebrow"><Gauge size={13} /> VELOCITY</span>
             <div className="velocity-row"><strong>{status.speed}</strong><small>KM/H</small></div>
             <div className="meter"><i style={{ width: `${Math.min(100, status.momentum)}%` }} /></div>
-            <span className="state-chip">{status.traversal.toUpperCase()}</span>
+            <span className="state-chip">{status.traversal.toUpperCase()} {status.chain > 1 ? `// CHAIN ${status.chain}` : ""}</span>
           </section>
           <section className="mission-rail">
             <span>{status.challenge.route} // {status.challenge.state.toUpperCase()}</span>
             <div className="route-line"><i /><i /><i /><i /></div>
             <span className="route-state"><Zap size={13} /> NODE {status.challenge.node}/{status.challenge.total} // {status.challenge.target}</span>
             <span className="challenge-time">{status.challenge.elapsed.toFixed(1)}s {status.challenge.best === null ? "// NO BEST" : `// BEST ${status.challenge.best.toFixed(1)}s`}</span>
+            <span className="discovery-state">{status.progression.discoveries}/{status.progression.discoveryTotal} CHARTED // {status.progression.credits} SIG // NEXT {status.progression.nextLandmark}</span>
           </section>
           <p className="system-note">{status.notification}</p>
           <div className="reticle" aria-hidden="true"><i /><i /><i /><i /></div>
@@ -102,9 +119,10 @@ function MenuPanel({ status, onSettings, settings, reducedMotion, highContrast, 
         {selecting && (
           <>
             <div className="operator-grid" role="radiogroup" aria-label="Select operator">
-              <CharacterCard id="vanta" active={status.character === "vanta"} name="VANTA" label="KINETIC WEAVE" description="Graphite silhouette. Amber tension core." />
-              <CharacterCard id="kite" active={status.character === "kite"} name="KITE" label="VECTOR PULSE" description="Pale signal shell. Cyan response trim." />
+              <CharacterCard id="vanta" active={status.character === "vanta"} name="VANTA" label="KINETIC WEAVE" description="Longer line tolerance. Stronger release momentum." />
+              <CharacterCard id="kite" active={status.character === "kite"} name="KITE" label="VECTOR PULSE" description="Faster zip response. Stronger wall kicks." />
             </div>
+            <p className="operator-trait">{status.characterTrait}</p>
             <button className="launch-button" onClick={() => emit("megapolis:start")}><Play size={17} fill="currentColor" /> BEGIN TRAVERSAL</button>
             <p className="control-strip">{status.menuHint}</p>
           </>
@@ -150,18 +168,33 @@ function CharacterCard({ id, active, name, label, description }: { id: Character
 function SettingsPanel({ status, reducedMotion, highContrast, onMotion, onContrast }: { status: GameStatus; reducedMotion: boolean; highContrast: boolean; onMotion: (value: boolean) => void; onContrast: (value: boolean) => void }) {
   const presets: QualityPreset[] = ["high", "medium", "low"];
   const weather: WeatherMode[] = ["clear", "rain", "storm"];
-  return <aside className="settings-card">
+  const update = (value: Partial<GameStatus["settings"]>) => emit("megapolis:settings", { ...status.settings, ...value });
+  return <aside className="settings-card" role="dialog" aria-label="Flight deck settings" tabIndex={-1}>
     <span className="eyebrow">SYSTEM LATTICE</span>
     <div className="quality-switch" role="group" aria-label="Quality preset">
-      {presets.map((preset) => <button key={preset} className={status.quality === preset ? "active" : ""} onClick={() => emit<QualityPreset>("megapolis:quality", preset)}>{preset}</button>)}
+      {presets.map((preset) => <button key={preset} aria-pressed={status.quality === preset} className={status.quality === preset ? "active" : ""} onClick={() => emit<QualityPreset>("megapolis:quality", preset)}>{preset}</button>)}
     </div>
     <span className="setting-label">WEATHER LATTICE</span>
     <div className="quality-switch weather-switch" role="group" aria-label="Weather profile">
-      {weather.map((mode) => <button key={mode} className={status.weather === mode ? "active" : ""} onClick={() => emit<WeatherMode>("megapolis:weather", mode)}>{mode}</button>)}
+      {weather.map((mode) => <button key={mode} aria-pressed={status.weather === mode} className={status.weather === mode ? "active" : ""} onClick={() => emit<WeatherMode>("megapolis:weather", mode)}>{mode}</button>)}
     </div>
+    <span className="setting-label">AUDIO MIX</span>
+    <RangeControl label="MASTER" value={status.settings.masterVolume} min={0} max={1} step={0.05} onChange={(value) => update({ masterVolume: value })} />
+    <RangeControl label="SFX" value={status.settings.sfxVolume} min={0} max={1} step={0.05} onChange={(value) => update({ sfxVolume: value })} />
+    <RangeControl label="AMBIENCE" value={status.settings.ambienceVolume} min={0} max={1} step={0.05} onChange={(value) => update({ ambienceVolume: value })} />
+    <span className="setting-label">FLIGHT CAMERA</span>
+    <RangeControl label="FOV" value={status.settings.fov} min={0.72} max={1.12} step={0.02} onChange={(value) => update({ fov: value })} />
+    <RangeControl label="LOOK" value={status.settings.sensitivity} min={0.45} max={1.8} step={0.05} onChange={(value) => update({ sensitivity: value })} />
+    <label className="motion-toggle"><span>INVERT Y</span><input type="checkbox" checked={status.settings.invertY} onChange={(event) => update({ invertY: event.target.checked })} /></label>
+    <label className="motion-toggle"><span>IMPACT SHAKE</span><input type="checkbox" checked={status.settings.screenShake} onChange={(event) => update({ screenShake: event.target.checked })} /></label>
     <label className="motion-toggle"><span>REDUCED MOTION</span><input type="checkbox" checked={reducedMotion} onChange={(event) => onMotion(event.target.checked)} /></label>
-    <label className="motion-toggle"><span>HIGH CONTRAST</span><input type="checkbox" checked={highContrast} onChange={(event) => onContrast(event.target.checked)} /></label>
+    <label className="motion-toggle"><span>HIGH CONTRAST</span><input type="checkbox" checked={highContrast} onChange={(event) => { onContrast(event.target.checked); emit("megapolis:contrast", event.target.checked); }} /></label>
     <label className="motion-toggle"><span>SHOWCASE CAMERA</span><input type="checkbox" checked={status.showcase} onChange={(event) => emit<boolean>("megapolis:showcase", event.target.checked)} /></label>
     <small>Auto fallback protects frame time during dense traversal.</small>
   </aside>;
+}
+
+function RangeControl({ label, value, min, max, step, onChange }: { label: string; value: number; min: number; max: number; step: number; onChange: (value: number) => void }) {
+  const suffix = label === "FOV" ? "°" : "%";
+  return <label className="range-control"><span>{label} <b>{Math.round(value * 100)}{suffix}</b></span><input aria-label={`${label} setting`} type="range" min={min} max={max} step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} /></label>;
 }

@@ -1,11 +1,15 @@
 // Aerial Transit Noir — world ownership keeps menu, traversal, quality, and HUD phases coherent.
 import type { Scene } from "@babylonjs/core";
+import type { AmbientCitySystem } from "./AmbientCitySystem";
+import { AudioManager } from "./AudioManager";
 import type { CameraRig } from "./CameraRig";
 import { ChallengeManager } from "./ChallengeManager";
 import type { CityBuilder } from "./CityBuilder";
 import { InputManager } from "./InputManager";
 import { PlayerController } from "./PlayerController";
+import { ProgressionManager } from "./ProgressionManager";
 import { QualityManager } from "./QualityManager";
+import { loadSettings, saveSettings, type GameplaySettings } from "./SettingsStore";
 import type { WeatherSystem } from "./WeatherSystem";
 import type { CharacterId, GamePhase, GameStatus, InputSnapshot, QualityPreset, WeatherMode } from "./types";
 
@@ -27,6 +31,9 @@ export class GameWorld {
   private weatherMode: WeatherMode = "rain";
   private showcase = false;
   private readonly challenge: ChallengeManager;
+  private readonly progression: ProgressionManager;
+  private settings: GameplaySettings;
+  private readonly audio: AudioManager;
 
   public constructor(
     private readonly scene: Scene,
@@ -36,9 +43,15 @@ export class GameWorld {
     private readonly camera: CameraRig,
     private readonly quality: QualityManager,
     private readonly weather: WeatherSystem,
+    private readonly ambient: AmbientCitySystem,
   ) {
     this.demo = new URLSearchParams(window.location.search).has("demo");
     this.challenge = new ChallengeManager(scene);
+    this.progression = new ProgressionManager(scene);
+    this.settings = loadSettings();
+    this.audio = new AudioManager(this.settings);
+    this.camera.setPreferences(this.settings);
+    this.camera.setReducedMotion(this.settings.reducedMotion);
     this.weather.setDensity(this.quality.effectDensity);
     this.bindEvents();
     this.timers.push(window.setTimeout(() => {
@@ -60,6 +73,7 @@ export class GameWorld {
   public update(delta: number): void {
     this.city.update(delta);
     this.weather.update(this.player.root.position, delta);
+    this.ambient.setDensity(this.quality.effectDensity);
     const raw = this.input.snapshot();
     if (this.phase === "selection") {
       if (raw.enterPressed) this.beginTraversal();
@@ -81,11 +95,17 @@ export class GameWorld {
         const actions = this.showcase ? idleInput : (this.demo ? this.demoInput(delta) : raw);
         this.camera.look(actions.lookX, actions.lookY);
         this.player.update(actions, this.camera, this.city, delta, true);
+        this.audio.update(this.player.getSpeed(), this.player.traversal, this.weatherMode, delta);
         this.camera.registerImpact(this.player.consumeImpact());
         this.camera.update(this.player.root.position, this.player.getSpeed(), this.city, delta, ["swing", "zip", "dive"].includes(this.player.traversal));
+        const ambientResponse = this.ambient.update(this.player.root.position, this.player.getSpeed(), delta);
+        if (ambientResponse) this.notification = ambientResponse;
+        const discovery = this.progression.update(this.player.root.position, this.player.getSpeed(), delta);
+        if (discovery) { this.notification = discovery; this.audio.cue("discover"); }
         if (this.challenge.update(this.player.root.position, delta)) {
           const progress = this.challenge.readout();
           this.notification = progress.state === "complete" ? `Circuit clear: ${progress.elapsed.toFixed(1)} seconds.` : `Route node ${progress.node - 1}/${progress.total} captured.`;
+          this.audio.cue("route");
         }
       }
     } else if (this.phase === "paused") {
@@ -115,14 +135,20 @@ export class GameWorld {
     this.input.dispose();
     this.player.dispose();
     this.challenge.dispose();
+    this.progression.dispose();
+    this.audio.dispose();
+    this.ambient.dispose();
     this.city.dispose();
   }
 
   private beginTraversal(): void {
     if (this.phase !== "selection") return;
     this.input.capturePointer();
+    this.audio.activate();
+    this.audio.cue("launch");
     this.phase = "transition";
     this.challenge.start();
+    this.progression.resetRun();
     this.transitionRemaining = 0.78;
     this.player.root.rotation.set(0, 0.4, 0);
     this.notification = "Transit clearance granted.";
@@ -134,6 +160,7 @@ export class GameWorld {
       this.phase = "paused";
       this.notification = "Traversal held. Systems standing by.";
       if (document.pointerLockElement) document.exitPointerLock();
+      this.audio.cue("pause");
     } else if (this.phase === "paused") {
       this.phase = "playing";
       this.notification = "Momentum restored.";
@@ -145,9 +172,12 @@ export class GameWorld {
   private restart(): void {
     if (!["playing", "paused", "recovery"].includes(this.phase)) return;
     this.player.reset();
-    this.challenge.reset();
+    const completedRoute = this.challenge.readout().state === "complete";
+    if (completedRoute) this.challenge.nextRoute();
+    else this.challenge.reset();
+    this.progression.resetRun();
     this.phase = "playing";
-    this.notification = "Route re-entered at Sector Zero.";
+    this.notification = completedRoute ? `New contract live: ${this.challenge.readout().route}.` : "Route re-entered at Sector Zero.";
     this.publishStatus(true);
   }
 
@@ -166,6 +196,8 @@ export class GameWorld {
   }
 
   private setReducedMotion(value: boolean): void {
+    this.settings = { ...this.settings, reducedMotion: value };
+    saveSettings(this.settings);
     this.camera.setReducedMotion(value);
     this.notification = value ? "Reduced motion enabled." : "Cinematic damping restored.";
     this.publishStatus(true);
@@ -185,17 +217,36 @@ export class GameWorld {
     this.publishStatus(true);
   }
 
+  private setSettings(value: GameplaySettings): void {
+    this.settings = value;
+    saveSettings(this.settings);
+    this.camera.setPreferences(this.settings);
+    this.camera.setReducedMotion(this.settings.reducedMotion);
+    this.audio.setSettings(this.settings);
+    this.notification = "Flight deck preferences stored.";
+    this.publishStatus(true);
+  }
+
+  private setContrast(value: boolean): void {
+    this.settings = { ...this.settings, highContrast: value };
+    saveSettings(this.settings);
+    this.publishStatus(true);
+  }
+
   private publishStatus(force = false): void {
     if (!force && this.phase === "loading") return;
     const target = this.player.target;
     const status: GameStatus = {
       phase: this.phase,
       character: this.player.selected,
+      characterTrait: this.player.getTrait(),
       traversal: this.player.traversal,
       speed: Math.round(this.player.getSpeed() * 3.6),
       momentum: this.player.getMomentum(),
+      chain: this.player.getChain(),
       target: target ? `${target.kind.toUpperCase()} LINK` : "SCANNING",
       targetDistance: target ? Math.round(target.position.subtract(this.player.root.position).length()) : 0,
+      anchorCue: this.player.getAnchorCue(),
       quality: this.quality.current,
       fps: Math.round(this.scene.getEngine().getFps()),
       notification: this.notification,
@@ -203,6 +254,8 @@ export class GameWorld {
       weather: this.weatherMode,
       showcase: this.showcase,
       challenge: this.challenge.readout(),
+      progression: this.progression.readout(),
+      settings: this.settings,
     };
     window.dispatchEvent(new CustomEvent<GameStatus>("megapolis:status", { detail: status }));
   }
@@ -239,6 +292,8 @@ export class GameWorld {
     listen<boolean>("megapolis:motion", (value) => this.setReducedMotion(value));
     listen<WeatherMode>("megapolis:weather", (value) => this.setWeather(value));
     listen<boolean>("megapolis:showcase", (value) => this.setShowcase(value));
+    listen<GameplaySettings>("megapolis:settings", (value) => this.setSettings(value));
+    listen<boolean>("megapolis:contrast", (value) => this.setContrast(value));
     listen("megapolis:pause", () => this.togglePause());
     listen("megapolis:restart", () => this.restart());
   }

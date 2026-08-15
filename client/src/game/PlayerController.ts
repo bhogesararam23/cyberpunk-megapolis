@@ -8,6 +8,11 @@ import type { Anchor, CharacterId, InputSnapshot, TraversalState } from "./types
 
 const UP = new Vector3(0, 1, 0);
 
+const CHARACTER_TRAITS: Record<CharacterId, string> = {
+  vanta: "KINETIC WEAVE // longer line tolerance and stronger release momentum",
+  kite: "VECTOR PULSE // faster zip response and stronger wall kicks",
+};
+
 export class PlayerController {
   public readonly root: TransformNode;
   public traversal: TraversalState = "idle";
@@ -37,6 +42,8 @@ export class PlayerController {
   private readonly trimMaterial: StandardMaterial;
   private readonly webMaterial: StandardMaterial;
   private readonly pulseCore: Mesh;
+  private readonly vantaMantles: Mesh[] = [];
+  private readonly kiteFin: Mesh;
   private trimBase = Color3.FromHexString("#f6a84d");
   private webLine: LinesMesh | null = null;
   private secondaryWebLine: LinesMesh | null = null;
@@ -45,6 +52,8 @@ export class PlayerController {
   private jumpBuffer = 0;
   private coyoteTime = 0;
   private landingImpact = 0;
+  private chain = 0;
+  private chainTimer = 0;
 
   public constructor(private readonly scene: import("@babylonjs/core").Scene) {
     this.root = new TransformNode("player-root", scene);
@@ -67,6 +76,19 @@ export class PlayerController {
     this.pulseCore.parent = this.root;
     this.pulseCore.position.set(0, 1.42, 0.23);
     this.pulseCore.material = this.trimMaterial;
+    for (const [x, name] of [[-0.58, "vanta-mantle-left"], [0.58, "vanta-mantle-right"]] as const) {
+      const mantle = MeshBuilder.CreateBox(name, { width: 0.24, height: 0.52, depth: 0.52 }, scene);
+      mantle.parent = this.root;
+      mantle.position.set(x, 1.73, -0.03);
+      mantle.rotation.z = x < 0 ? 0.18 : -0.18;
+      mantle.material = this.trimMaterial;
+      this.vantaMantles.push(mantle);
+    }
+    this.kiteFin = MeshBuilder.CreateBox("kite-vector-fin", { width: 0.18, height: 0.78, depth: 0.42 }, scene);
+    this.kiteFin.parent = this.root;
+    this.kiteFin.position.set(0, 1.56, -0.28);
+    this.kiteFin.rotation.x = -0.28;
+    this.kiteFin.material = this.trimMaterial;
     this.hip = MeshBuilder.CreateBox("avatar-hip", { width: 0.55, height: 0.28, depth: 0.34 }, scene);
     this.hip.parent = this.root;
     this.hip.position.y = 0.4;
@@ -100,6 +122,21 @@ export class PlayerController {
     this.trimMaterial.diffuseColor = Color3.FromHexString(vanta ? "#4f2d18" : "#183e49");
     this.trimBase = Color3.FromHexString(vanta ? "#f6a84d" : "#43f6e8");
     this.trimMaterial.emissiveColor = this.trimBase.clone();
+    for (const mantle of this.vantaMantles) mantle.isVisible = vanta;
+    this.kiteFin.isVisible = !vanta;
+  }
+
+  public getTrait(): string {
+    return CHARACTER_TRAITS[this.selected];
+  }
+
+  public getChain(): number {
+    return this.chain;
+  }
+
+  public getAnchorCue(): "scanning" | "ready" | "boost" {
+    if (!this.target) return "scanning";
+    return this.getSpeed() > 18 || this.traversal === "swing" ? "boost" : "ready";
   }
 
   public reset(position = new Vector3(0, 2, 0)): void {
@@ -111,6 +148,8 @@ export class PlayerController {
     this.swingTension = 0;
     this.zipAnchor = null;
     this.target = null;
+    this.chain = 0;
+    this.chainTimer = 0;
     this.webLine?.dispose();
     this.secondaryWebLine?.dispose();
     this.webLine = null;
@@ -126,6 +165,8 @@ export class PlayerController {
       return;
     }
     this.jumpBuffer = Math.max(0, this.jumpBuffer - delta);
+    this.chainTimer = Math.max(0, this.chainTimer - delta);
+    if (this.chainTimer === 0) this.chain = 0;
     this.coyoteTime = Math.max(0, this.coyoteTime - delta);
     this.landingImpact = Math.max(0, this.landingImpact - delta * 2.8);
     if (input.jumpPressed) this.jumpBuffer = 0.14;
@@ -211,8 +252,9 @@ export class PlayerController {
         this.traversal = "fall";
       } else {
         const targetSpeed = Math.min(58, 26 + distance * 0.46);
+        const characterSpeed = this.selected === "kite" ? 1.14 : 1;
         const brake = distance < 16 ? Math.max(0.38, distance / 16) : 1;
-        const desiredVelocity = toAnchor.scale(1 / distance).scale(targetSpeed * brake);
+        const desiredVelocity = toAnchor.scale(1 / distance).scale(targetSpeed * characterSpeed * brake);
         this.velocity = Vector3.Lerp(this.velocity, desiredVelocity, Math.min(1, delta * (8.4 - brake * 2.2)));
         this.traversal = "zip";
         return;
@@ -223,10 +265,12 @@ export class PlayerController {
       const tangent = Vector3.Cross(UP, this.wallNormal).normalize();
       const direction = desired.lengthSquared() > 0.01 && Vector3.Dot(tangent, desired) < 0 ? tangent.scale(-1) : tangent;
       if (this.jumpBuffer > 0) {
-        this.velocity = direction.scale(17.5).add(this.wallNormal.scale(8.8)).add(UP.scale(12.4));
+        const kick = this.selected === "kite" ? 1.18 : 1;
+        this.velocity = direction.scale(17.5 * kick).add(this.wallNormal.scale(8.8 * kick)).add(UP.scale(12.4 * kick));
         this.wallNormal = null;
         this.jumpBuffer = 0;
         this.traversal = "jump";
+        this.registerChain();
         return;
       }
       this.velocity = Vector3.Lerp(this.velocity, direction.scale(18.2), Math.min(1, delta * 7.2));
@@ -300,7 +344,8 @@ export class PlayerController {
     this.secondarySwingAnchor = this.getSpeed() > 16 ? city.findSecondaryAnchor(this.root.position, camera.getForward(), anchor.id, this.velocity) : null;
     this.zipAnchor = null;
     const distance = Vector3.Distance(this.getHandPosition(), anchor.position);
-    this.swingLength = Math.max(10, distance * (this.getSpeed() > 20 ? 0.94 : 0.88));
+    const tolerance = this.selected === "vanta" ? 1.08 : 0.98;
+    this.swingLength = Math.max(10, distance * (this.getSpeed() > 20 ? 0.94 : 0.88) * tolerance);
     this.swingTension = 0.18;
     this.traversal = "swing";
   }
@@ -310,12 +355,14 @@ export class PlayerController {
     const fromAnchor = this.getHandPosition().subtract(this.swingAnchor.position).normalize();
     const outward = Math.max(0, Vector3.Dot(this.velocity, fromAnchor));
     if (outward > 0) this.velocity.subtractInPlace(fromAnchor.scale(outward * 0.5));
-    const forwardBoost = new Vector3(this.lastMove.x, 0, this.lastMove.z).normalize().scale(3.5 + Math.min(9, this.getSpeed() * 0.16));
+    const releaseBoost = this.selected === "vanta" ? 1.22 : 1.06;
+    const forwardBoost = new Vector3(this.lastMove.x, 0, this.lastMove.z).normalize().scale((3.5 + Math.min(9, this.getSpeed() * 0.16)) * releaseBoost);
     this.velocity.addInPlace(forwardBoost);
     this.swingAnchor = null;
     this.secondarySwingAnchor = null;
     this.swingTension = 0;
     this.traversal = "fall";
+    this.registerChain();
   }
 
   private startZip(anchor: Anchor): void {
@@ -324,6 +371,7 @@ export class PlayerController {
     this.secondarySwingAnchor = null;
     this.swingTension = 0;
     this.traversal = "zip";
+    this.registerChain();
   }
 
   private updateFacing(): void {
@@ -373,7 +421,7 @@ export class PlayerController {
     this.rightLowerArm.rotation.x += ((-arm * 0.58) - this.rightLowerArm.rotation.x) * blend;
     this.leftLeg.rotation.x += (leg - this.leftLeg.rotation.x) * blend;
     this.rightLeg.rotation.x += ((-leg) - this.rightLeg.rotation.x) * blend;
-    const kinetic = Math.min(1, this.getSpeed() / 32) + this.swingTension * 0.8 + (this.traversal === "zip" ? 0.5 : 0) + this.landingImpact * 0.65;
+    const kinetic = Math.min(1, this.getSpeed() / 32) + this.swingTension * 0.8 + (this.traversal === "zip" ? 0.5 : 0) + this.landingImpact * 0.65 + Math.min(0.25, this.chain * 0.04);
     const pulse = 0.8 + kinetic * 0.5 + Math.sin(this.elapsed * 9) * 0.08;
     this.pulseCore.scaling.set(1, pulse, 1);
     this.trimMaterial.emissiveColor = this.trimBase.scale(0.68 + kinetic * 0.46);
@@ -427,5 +475,10 @@ export class PlayerController {
     mesh.parent = hand;
     mesh.material = this.trimMaterial;
     return hand;
+  }
+
+  private registerChain(): void {
+    this.chain = Math.min(12, this.chain + 1);
+    this.chainTimer = 4.6;
   }
 }

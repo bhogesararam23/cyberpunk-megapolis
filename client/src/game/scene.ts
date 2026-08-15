@@ -3,12 +3,14 @@ import {
   Color3, Color4, DirectionalLight, Engine, GlowLayer, HemisphericLight, Scene, Vector3,
 } from "@babylonjs/core";
 import { CameraRig } from "./CameraRig";
+import { AmbientCitySystem } from "./AmbientCitySystem";
 import { CityBuilder } from "./CityBuilder";
 import { GameWorld } from "./GameWorld";
 import { InputManager } from "./InputManager";
 import { PlayerController } from "./PlayerController";
 import { QualityManager } from "./QualityManager";
 import { WeatherSystem } from "./WeatherSystem";
+import { TimeOfDaySystem } from "./TimeOfDaySystem";
 import type { QualityPreset } from "./types";
 
 export interface GameHandle {
@@ -38,14 +40,18 @@ export async function createGameScene(engine: Engine, canvas: HTMLCanvasElement)
   scene.activeCamera = camera.camera;
   const input = new InputManager(canvas);
   const weather = new WeatherSystem(scene);
+  const timeOfDay = new TimeOfDaySystem(scene, dusk, horizon, glow);
+  const ambient = new AmbientCitySystem(scene);
   let quality!: QualityManager;
   quality = new QualityManager(engine, scene, glow, (preset: QualityPreset) => {
     window.dispatchEvent(new CustomEvent<QualityPreset>("megapolis:quality-ready", { detail: preset }));
   });
-  const world = new GameWorld(scene, input, city, player, camera, quality, weather);
+  const world = new GameWorld(scene, input, city, player, camera, quality, weather, ambient);
   scene.onBeforeRenderObservable.add(() => {
     const rawDelta = scene.getEngine().getDeltaTime() / 1000;
-    world.update(Math.min(0.05, Math.max(0.001, rawDelta)));
+    const delta = Math.min(0.05, Math.max(0.001, rawDelta));
+    world.update(delta);
+    timeOfDay.update(delta, weather.currentMode);
   });
   return {
     scene,

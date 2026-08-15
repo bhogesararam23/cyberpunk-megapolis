@@ -19,3 +19,11 @@ The title screen maintains a clear dark-to-city composition with the generated r
 The restarted `/?demo` route rendered successfully at 1280×720 with the player, target vector, Skyrail Circuit telemetry, speed panel, and cyan traversal lines present in a stable composition. The lower-right route readout remained legible without competing with the target panel or velocity card.
 
 The complete headless suite passed with eight assertions across city collision and anchors, Skyrail Circuit progression, quality fallback, and weather-density budgeting. A production `pnpm build` attempt reached Vite transformation but was terminated by the sandbox under elevated memory pressure (exit 143) while transforming the dependency graph. This is an environment-limited packaging check rather than a known application compile failure: the incremental type checker remained clean and the restarted live runtime rendered correctly afterward.
+
+## Feature-Gap Completion Pass — 2026-08-15
+
+The deterministic `/?demo` route rendered at 1280×720 after the final feature pass, with a visible swinging operator, traversal target, Skyrail Circuit instrumentation, character silhouette markers, route lines, and dynamic atmosphere. The new time-of-day cycle deliberately starts at a legible blue-dusk keyframe and gradually moves through night and dawn while rain and storm profiles dim the scene lights and lift the neon glow response.
+
+The mobile launch menu rendered at 375×812 with the generated city backdrop, operator cards, launch control, and System Settings trigger all visible and reachable. The settings flight deck persists audio mix, FOV, look sensitivity, inverted vertical look, impact shake, reduced motion, and high contrast; its range inputs have explicit accessible labels, grouped selectors expose pressed state, and Escape closes the panel.
+
+The final static check passed. The full Vitest suite passed all 12 assertions across CityBuilder, ChallengeManager, PlayerController, ProgressionManager, QualityManager, and WeatherSystem. The final gap review found no remaining P0 or P1 obligations in the agreed traversal-first scope; retained limitations are deliberate non-goals rather than visible placeholder systems.
