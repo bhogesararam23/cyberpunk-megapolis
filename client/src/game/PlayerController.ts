@@ -465,16 +465,17 @@ export class PlayerController {
     this.leftLeg.rotation.x += (leg - this.leftLeg.rotation.x) * blend;
     this.rightLeg.rotation.x += ((-leg) - this.rightLeg.rotation.x) * blend;
     const kinetic = Math.min(1, this.getSpeed() / 32) + this.swingTension * 0.8 + (this.traversal === "zip" ? 0.5 : 0) + this.landingImpact * 0.65 + Math.min(0.25, this.chain * 0.04);
-    const pulse = 0.8 + kinetic * 0.5 + Math.sin(this.elapsed * 9) * 0.08;
+    const pulse = 0.84 + kinetic * 0.4 + Math.sin(this.elapsed * (7.5 + kinetic * 2.5)) * 0.055;
     this.pulseCore.scaling.set(1, pulse, 1);
-    this.trimMaterial.emissiveColor = this.trimBase.scale(0.68 + kinetic * 0.46);
+    this.pulseCore.visibility = 0.66 + Math.min(0.34, kinetic * 0.24);
+    this.trimMaterial.emissiveColor = this.trimBase.scale(0.54 + kinetic * 0.32);
     const speedRatio = Math.min(1, this.getSpeed() / 32);
-    this.flightRing.visibility = this.traversal === "idle" ? 0 : 0.08 + kinetic * 0.52;
-    this.flightRing.scaling.set(0.82 + speedRatio * 0.42, 1, 0.82 + speedRatio * 0.42);
-    this.flightRing.rotation.z = this.elapsed * (0.65 + speedRatio * 4.4);
+    this.flightRing.visibility = this.traversal === "idle" ? 0 : 0.06 + kinetic * 0.42;
+    this.flightRing.scaling.set(0.86 + speedRatio * 0.34, 1, 0.86 + speedRatio * 0.34);
+    this.flightRing.rotation.z = this.elapsed * (0.48 + speedRatio * 3.6);
     this.jetSignals.forEach((jet, index) => {
-      jet.visibility = 0.14 + kinetic * 0.72;
-      jet.scaling.y = 0.7 + kinetic * (0.75 + index * 0.08);
+      jet.visibility = 0.12 + kinetic * 0.58;
+      jet.scaling.y = 0.76 + kinetic * (0.56 + index * 0.06);
     });
   }
 
@@ -490,12 +491,13 @@ export class PlayerController {
     const start = this.getHandPosition();
     const end = anchor.position;
     const distance = Vector3.Distance(start, end);
-    const sag = Math.max(0.38, distance * (0.055 + (1 - this.swingTension) * 0.055));
+    const sag = Math.max(0.28, distance * (0.034 + (1 - this.swingTension) * 0.045));
     const middle = Vector3.Lerp(start, end, 0.5).add(new Vector3(0, -sag, 0));
     const pulse = Math.sin(this.elapsed * (10 + this.getSpeed() * 0.16)) * Math.min(0.35, this.getSpeed() * 0.008);
     const points = [start, Vector3.Lerp(start, middle, 0.42).add(new Vector3(0, pulse, 0)), middle, Vector3.Lerp(middle, end, 0.58).add(new Vector3(0, -pulse, 0)), end];
     const line = MeshBuilder.CreateLines("active-web", { points, instance: this.webLine ?? undefined, updatable: true }, this.scene);
-    line.color = Color3.FromHexString(this.zipAnchor ? "#f6a84d" : "#43f6e8");
+    line.color = Color3.FromHexString(this.zipAnchor ? "#e8a250" : "#35ded3");
+    line.visibility = this.zipAnchor ? 0.86 : 0.62 + this.swingTension * 0.34;
     this.webLine = line;
     if (this.secondarySwingAnchor) {
       const secondStart = this.leftHand.getAbsolutePosition();

@@ -84,22 +84,22 @@ export class CameraRig {
     this.traversalEnergy = Math.max(0, this.traversalEnergy - delta * 1.45);
     this.sideLead += (0 - this.sideLead) * Math.min(1, delta * 2.8);
     const speedRatio = Math.min(1, speed / 38);
-    const distance = this.showcase ? this.photoDistance : 8.5 + Math.min(6.2, speed * 0.15) + (dramatic ? 1.5 : 0);
-    const anticipation = Math.min(11.6, 5.2 + speed * 0.14);
+    const distance = this.showcase ? this.photoDistance : 10.1 + Math.min(5.7, speed * 0.14) + (dramatic ? 1.15 : 0);
+    const anticipation = Math.min(11.2, 5.8 + speed * 0.13);
     const verticalLead = Math.max(-1.8, Math.min(2.8, this.verticalVelocity * 0.05));
     const lateral = Vector3.Cross(new Vector3(0, 1, 0), forward).normalize().scale(this.sideLead * (0.7 + speedRatio * 0.9));
     const target = playerPosition.add(new Vector3(0, 1.65 + verticalLead + this.traversalEnergy * 0.34, 0)).add(forward.scale(anticipation + this.chainBias * 1.8)).add(lateral);
     const desired = this.showcase
       ? playerPosition.add(new Vector3(Math.cos(this.yaw) * distance, 4.2 + Math.sin(this.yaw * 0.72) * 1.4, Math.sin(this.yaw) * distance))
-      : playerPosition.add(new Vector3(0, 3.4 + (dramatic ? 1.5 : 0) + speedRatio * 1.1 + this.traversalEnergy * 0.36, 0)).subtract(forward.scale(distance + this.chainBias * 1.1)).add(lateral.scale(0.28));
+      : playerPosition.add(new Vector3(0, 2.86 + (dramatic ? 1.2 : 0) + speedRatio * 1.05 + this.traversalEnergy * 0.28, 0)).subtract(forward.scale(distance + this.chainBias * 0.9)).add(lateral.scale(0.24));
     const safePosition = city.resolveCameraPath(target, desired);
     const damping = this.reducedMotion ? 1 : 1 - Math.exp(-delta * (this.showcase ? 4.5 : dramatic ? 11 : 8));
     this.camera.position = Vector3.Lerp(this.camera.position, safePosition, damping);
     this.camera.setTarget(target);
-    const desiredRoll = this.reducedMotion || this.showcase ? 0 : Math.max(-0.085, Math.min(0.085, -displacement.x * 0.018 + forward.x * speedRatio * 0.035));
-    this.cameraRoll += (desiredRoll - this.cameraRoll) * Math.min(1, delta * 7);
-    this.camera.rotation.z = this.cameraRoll + (this.reducedMotion ? 0 : Math.sin(performance.now() * 0.033) * this.impact * 0.018);
-    const desiredFov = this.showcase ? this.photoFov : this.baseFov - 0.12 + Math.min(0.12, speed / 320) + (dramatic ? 0.014 : 0) + this.traversalEnergy * 0.022;
-    this.camera.fov += (desiredFov - this.camera.fov) * Math.min(1, delta * 6);
+    const desiredRoll = this.reducedMotion || this.showcase ? 0 : Math.max(-0.06, Math.min(0.06, -displacement.x * 0.014 + forward.x * speedRatio * 0.026));
+    this.cameraRoll += (desiredRoll - this.cameraRoll) * Math.min(1, delta * 5.6);
+    this.camera.rotation.z = this.cameraRoll + (this.reducedMotion ? 0 : Math.sin(performance.now() * 0.03) * this.impact * 0.014);
+    const desiredFov = this.showcase ? this.photoFov : this.baseFov - 0.06 + Math.min(0.105, speed / 360) + (dramatic ? 0.01 : 0) + this.traversalEnergy * 0.016;
+    this.camera.fov += (desiredFov - this.camera.fov) * Math.min(1, delta * 4.6);
   }
 }

@@ -21,11 +21,11 @@ interface AtmosphereKeyframe {
 }
 
 const KEYFRAMES: AtmosphereKeyframe[] = [
-  { at: 0, clear: Color4.FromHexString("#010614ff"), fog: Color3.FromHexString("#040b18"), sky: Color3.FromHexString("#273c64"), horizon: Color3.FromHexString("#506ebb"), skyIntensity: 0.32, horizonIntensity: 0.1, glow: 0.82 },
-  { at: 0.25, clear: Color4.FromHexString("#243e64ff"), fog: Color3.FromHexString("#182943"), sky: Color3.FromHexString("#7998bd"), horizon: Color3.FromHexString("#ffc27f"), skyIntensity: 0.55, horizonIntensity: 0.45, glow: 0.66 },
-  { at: 0.5, clear: Color4.FromHexString("#07152aff"), fog: Color3.FromHexString("#07152a"), sky: Color3.FromHexString("#5a799f"), horizon: Color3.FromHexString("#f4a567"), skyIntensity: 0.6, horizonIntensity: 0.55, glow: 0.54 },
-  { at: 0.75, clear: Color4.FromHexString("#010817ff"), fog: Color3.FromHexString("#031022"), sky: Color3.FromHexString("#314f7a"), horizon: Color3.FromHexString("#5d7fd0"), skyIntensity: 0.36, horizonIntensity: 0.13, glow: 0.8 },
-  { at: 1, clear: Color4.FromHexString("#010614ff"), fog: Color3.FromHexString("#040b18"), sky: Color3.FromHexString("#273c64"), horizon: Color3.FromHexString("#506ebb"), skyIntensity: 0.32, horizonIntensity: 0.1, glow: 0.82 },
+  { at: 0, clear: Color4.FromHexString("#010614ff"), fog: Color3.FromHexString("#040b18"), sky: Color3.FromHexString("#203557"), horizon: Color3.FromHexString("#4563a5"), skyIntensity: 0.28, horizonIntensity: 0.08, glow: 0.66 },
+  { at: 0.25, clear: Color4.FromHexString("#1a304fff"), fog: Color3.FromHexString("#12233c"), sky: Color3.FromHexString("#6683a8"), horizon: Color3.FromHexString("#e5a46a"), skyIntensity: 0.46, horizonIntensity: 0.32, glow: 0.5 },
+  { at: 0.5, clear: Color4.FromHexString("#061329ff"), fog: Color3.FromHexString("#061329"), sky: Color3.FromHexString("#45698f"), horizon: Color3.FromHexString("#d9915e"), skyIntensity: 0.5, horizonIntensity: 0.4, glow: 0.42 },
+  { at: 0.75, clear: Color4.FromHexString("#010817ff"), fog: Color3.FromHexString("#031022"), sky: Color3.FromHexString("#294467"), horizon: Color3.FromHexString("#4d6db5"), skyIntensity: 0.31, horizonIntensity: 0.11, glow: 0.62 },
+  { at: 1, clear: Color4.FromHexString("#010614ff"), fog: Color3.FromHexString("#040b18"), sky: Color3.FromHexString("#203557"), horizon: Color3.FromHexString("#4563a5"), skyIntensity: 0.28, horizonIntensity: 0.08, glow: 0.66 },
 ];
 
 export class TimeOfDaySystem {
@@ -46,7 +46,7 @@ export class TimeOfDaySystem {
     const next = KEYFRAMES[KEYFRAMES.indexOf(current) + 1] ?? KEYFRAMES[1];
     const mix = (time - current.at) / Math.max(0.0001, next.at - current.at);
     const weatherDim = weather === "storm" ? 0.68 : weather === "rain" ? 0.86 : 1;
-    const stormGlow = weather === "storm" ? 0.08 : weather === "rain" ? 0.035 : 0;
+    const stormGlow = weather === "storm" ? 0.055 : weather === "rain" ? 0.022 : 0;
 
     this.scene.clearColor = Color4.Lerp(current.clear, next.clear, mix);
     this.scene.fogColor = Color3.Lerp(current.fog, next.fog, mix);

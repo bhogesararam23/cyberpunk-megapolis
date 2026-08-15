@@ -72,14 +72,14 @@ export class AudioManager {
       this.overtoneGain.gain.setTargetAtTime(0, now, 0.035);
       return;
     }
-    const weatherLift = weather === "storm" ? 0.022 : weather === "rain" ? 0.012 : 0.004;
-    const phaseLift = this.atmosphere?.phase === "night" ? 0.012 : this.atmosphere?.phase === "dawn" ? 0.007 : 0.004;
-    const level = Math.min(0.1, (weatherLift + phaseLift + this.eventIntensity * 0.012 + Math.min(0.045, speed * 0.0011)) * this.settings.masterVolume * this.settings.ambienceVolume);
+    const weatherLift = weather === "storm" ? 0.016 : weather === "rain" ? 0.009 : 0.003;
+    const phaseLift = this.atmosphere?.phase === "night" ? 0.009 : this.atmosphere?.phase === "dawn" ? 0.005 : 0.003;
+    const level = Math.min(0.078, (weatherLift + phaseLift + this.eventIntensity * 0.009 + Math.min(0.034, speed * 0.00085)) * this.settings.masterVolume * this.settings.ambienceVolume);
     this.ambientGain.gain.setTargetAtTime(level, now, Math.max(0.03, delta * 1.6));
     const bed = this.atmosphere?.bedFrequency ?? 42;
     const overtone = this.atmosphere?.overtoneFrequency ?? 118;
     this.ambientOscillator.frequency.setTargetAtTime(bed + Math.min(62, speed * 1.2), now, 0.12);
-    const overtoneLevel = Math.min(0.045, (0.006 + this.eventIntensity * 0.02 + Math.min(0.014, speed * 0.00035)) * this.settings.masterVolume * this.settings.ambienceVolume);
+    const overtoneLevel = Math.min(0.032, (0.004 + this.eventIntensity * 0.014 + Math.min(0.01, speed * 0.00028)) * this.settings.masterVolume * this.settings.ambienceVolume);
     this.overtoneGain.gain.setTargetAtTime(overtoneLevel, now, Math.max(0.05, delta * 2));
     this.overtoneOscillator.frequency.setTargetAtTime(overtone + Math.min(90, speed * 1.5), now, 0.16);
     if (traversal !== this.lastTraversal) {

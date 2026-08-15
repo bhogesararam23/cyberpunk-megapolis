@@ -50,10 +50,10 @@ export class CityBuilder {
     this.dark = this.material("city-ink", INK, Color3.FromHexString("#101d31"));
     this.concrete = this.material("city-concrete", Color3.FromHexString("#18243a"), Color3.FromHexString("#172c40"));
     this.slate = this.material("city-slate", Color3.FromHexString("#243148"), Color3.FromHexString("#1d293e"));
-    this.warmWindow = this.material("window-amber", Color3.FromHexString("#4a2f18"), AMBER.scale(0.85));
-    this.coolWindow = this.material("window-cyan", Color3.FromHexString("#0f3640"), CYAN.scale(0.45));
-    this.cyanLight = this.material("signal-cyan", Color3.FromHexString("#103b43"), CYAN);
-    this.amberLight = this.material("signal-amber", Color3.FromHexString("#4b2d12"), AMBER);
+    this.warmWindow = this.material("window-amber", Color3.FromHexString("#4a2f18"), AMBER.scale(0.62));
+    this.coolWindow = this.material("window-cyan", Color3.FromHexString("#0f3640"), CYAN.scale(0.3));
+    this.cyanLight = this.material("signal-cyan", Color3.FromHexString("#103b43"), CYAN.scale(0.72));
+    this.amberLight = this.material("signal-amber", Color3.FromHexString("#4b2d12"), AMBER.scale(0.74));
     this.facade = this.material("facade-atlas", Color3.FromHexString("#1d2c42"), Color3.FromHexString("#172940"));
     const facadeAtlas = new Texture("/manus-storage/city-facade-atlas_ad18a2d6.png", scene);
     facadeAtlas.uScale = 1.5;
@@ -61,16 +61,16 @@ export class CityBuilder {
     this.facade.diffuseTexture = facadeAtlas;
     this.facade.emissiveTexture = facadeAtlas;
     this.facade.emissiveColor = Color3.FromHexString("#142235");
-    this.signDecal = this.material("sign-atlas", Color3.FromHexString("#16414c"), CYAN.scale(0.82));
+    this.signDecal = this.material("sign-atlas", Color3.FromHexString("#16414c"), CYAN.scale(0.62));
     const signAtlas = new Texture("/manus-storage/neon-sign-atlas_fe673f95.png", scene);
     this.signDecal.diffuseTexture = signAtlas;
     this.signDecal.emissiveTexture = signAtlas;
-    this.signDecal.emissiveColor = Color3.FromHexString("#2a7f87");
-    this.transitDecal = this.material("vnext-transit-wayfinding", Color3.FromHexString("#163947"), CYAN.scale(0.9));
+    this.signDecal.emissiveColor = Color3.FromHexString("#23656e");
+    this.transitDecal = this.material("vnext-transit-wayfinding", Color3.FromHexString("#163947"), CYAN.scale(0.68));
     const transitAtlas = new Texture("/manus-storage/vnext-transit-signage-atlas_414d8bd0.png", scene);
     this.transitDecal.diffuseTexture = transitAtlas;
     this.transitDecal.emissiveTexture = transitAtlas;
-    this.transitDecal.emissiveColor = Color3.FromHexString("#1e7380");
+    this.transitDecal.emissiveColor = Color3.FromHexString("#185c67");
   }
 
   public build(): void {
@@ -285,7 +285,7 @@ export class CityBuilder {
   }
 
   private createTransitNetwork(): void {
-    const railMaterial = this.material("rail-steel", Color3.FromHexString("#264256"), Color3.FromHexString("#113746"));
+    const railMaterial = this.material("rail-steel", Color3.FromHexString("#264256"), Color3.FromHexString("#0c2a36"));
     const points = [
       new Vector3(-144, 22, -52), new Vector3(-72, 25, -52), new Vector3(0, 29, -52), new Vector3(72, 24, -52), new Vector3(144, 22, -52),
       new Vector3(-144, 22, 52), new Vector3(-72, 27, 52), new Vector3(0, 31, 52), new Vector3(72, 26, 52), new Vector3(144, 22, 52),

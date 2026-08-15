@@ -55,7 +55,7 @@ export default function GameHUD() {
   const paused = status.phase === "paused";
 
   return (
-    <div className={`game-hud ${highContrast ? "high-contrast" : ""} ${status.photo.hudHidden ? "photo-hud-hidden" : ""}`} aria-live="polite">
+    <div className={`game-hud ${highContrast ? "high-contrast" : ""} ${status.photo.hudHidden ? "photo-hud-hidden" : ""}`}>
       <div className="hud-noise" />
       <div className="flight-cartography" aria-hidden="true">
         <span className="flight-line primary" />
@@ -87,22 +87,22 @@ export default function GameHUD() {
             <span className="anchor-cue">{status.anchorCue === "boost" ? "MOMENTUM WINDOW // HOT" : status.anchorCue === "ready" ? "ANCHOR WINDOW // READY" : "ANCHOR WINDOW // SWEEP"}</span>
             <span>{status.targetDistance ? `${status.targetDistance}m // unblocked path` : "sweep city geometry"}</span>
           </section>
-          <button className="map-trigger" aria-expanded={status.navigation.visible} aria-controls="tactical-atlas" onClick={() => emit<boolean>("megapolis:map", !status.navigation.visible)}><Map size={14} /> CITY ATLAS <kbd>M</kbd></button>
+          <button className="map-trigger" aria-expanded={status.navigation.visible} aria-controls="tactical-atlas" aria-keyshortcuts="M" title="Open City Atlas (M)" onClick={() => emit<boolean>("megapolis:map", !status.navigation.visible)}><Map size={14} /> CITY ATLAS <kbd>M</kbd></button>
           <section className="velocity-panel">
             <span className="eyebrow"><Gauge size={13} /> VELOCITY</span>
             <div className="velocity-row"><strong>{status.speed}</strong><small>KM/H</small></div>
             <div className="meter"><i style={{ width: `${Math.min(100, status.momentum)}%` }} /></div>
             <span className="state-chip">{status.traversal.toUpperCase()} {status.chain > 1 ? `// CHAIN ${status.chain}` : ""}</span>
           </section>
-          <section className="mission-rail">
+          <section className={`mission-rail ${status.challenge.state}`} aria-label="Route contract status">
             <span>{status.challenge.route} // {status.challenge.state.toUpperCase()}</span>
             <div className="route-line"><i /><i /><i /><i /></div>
             <span className="route-state"><Zap size={13} /> NODE {status.challenge.node}/{status.challenge.total} // {status.challenge.target}</span>
             <span className="challenge-time">{status.challenge.elapsed.toFixed(1)}s {status.challenge.best === null ? "// NO BEST" : `// BEST ${status.challenge.best.toFixed(1)}s // ${status.challenge.medal?.toUpperCase() ?? "SIGNAL"}`}</span>
             <span className="discovery-state">{status.progression.discoveries}/{status.progression.discoveryTotal} CHARTED // {status.progression.credits} SIG // NEXT {status.progression.nextLandmark}</span>
           </section>
-          <section className={`objective-rail ${status.objective.state}`} aria-label="Current traversal objective"><span>LOCAL OBJECTIVE // {status.objective.completed}/{status.objective.total}</span><strong>{status.objective.label} // {status.objective.state.toUpperCase()}</strong><small>{status.objective.instruction}{status.objective.unlockLabel ? ` // REQUIRED: ${status.objective.unlockLabel.replace(/-/g, " ").toUpperCase()}` : ""}</small><div><i style={{ width: `${status.objective.progress}%` }} /></div><em>{status.objective.elapsed.toFixed(1)}/{status.objective.limit}s // +{status.objective.reward} SIG {status.objective.best === null ? "" : `// BEST ${status.objective.best.toFixed(1)}s`}</em></section>
-          <p className="system-note">{status.notification}</p>
+          <section className={`objective-rail ${status.objective.state}`} aria-label="Current traversal objective"><span>LOCAL OBJECTIVE // {status.objective.completed}/{status.objective.total}</span><strong>{status.objective.label} // {status.objective.state.toUpperCase()}</strong><small>{status.objective.instruction}{status.objective.unlockLabel ? ` // REQUIRED: ${status.objective.unlockLabel.replace(/-/g, " ").toUpperCase()}` : ""}</small><div><i style={{ width: `${status.objective.progress}%` }} /></div><em>{status.objective.elapsed.toFixed(1)}/{status.objective.limit}s // +{status.objective.reward} SIG {status.objective.best === null ? "" : `// BEST ${status.objective.best.toFixed(1)}`}</em></section>
+          <p className="system-note" role="status" aria-live="polite">{status.notification}</p>
           {status.diagnosticsVisible && <DiagnosticsOverlay status={status} />}
           {status.navigation.visible && <TacticalAtlas status={status} />}
           {status.photo.active && <PhotoDeck status={status} />}
