@@ -13,7 +13,7 @@ export class QualityManager {
     private readonly glow: GlowLayer,
     onPreset: (preset: QualityPreset) => void,
   ) {
-    const lowDevice = navigator.hardwareConcurrency !== undefined && navigator.hardwareConcurrency <= 4;
+    const lowDevice = typeof navigator !== "undefined" && navigator.hardwareConcurrency !== undefined && navigator.hardwareConcurrency <= 4;
     this.preset = lowDevice ? "medium" : "high";
     this.apply(this.preset);
     onPreset(this.preset);
@@ -21,6 +21,10 @@ export class QualityManager {
 
   public get current(): QualityPreset {
     return this.preset;
+  }
+
+  public get effectDensity(): number {
+    return { high: 1, medium: 0.68, low: 0.38 }[this.preset];
   }
 
   public apply(preset: QualityPreset): void {

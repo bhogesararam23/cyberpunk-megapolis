@@ -1,11 +1,13 @@
 // Aerial Transit Noir — world ownership keeps menu, traversal, quality, and HUD phases coherent.
 import type { Scene } from "@babylonjs/core";
 import type { CameraRig } from "./CameraRig";
+import { ChallengeManager } from "./ChallengeManager";
 import type { CityBuilder } from "./CityBuilder";
 import { InputManager } from "./InputManager";
 import { PlayerController } from "./PlayerController";
 import { QualityManager } from "./QualityManager";
-import type { CharacterId, GamePhase, GameStatus, InputSnapshot, QualityPreset } from "./types";
+import type { WeatherSystem } from "./WeatherSystem";
+import type { CharacterId, GamePhase, GameStatus, InputSnapshot, QualityPreset, WeatherMode } from "./types";
 
 const idleInput: InputSnapshot = {
   moveX: 0, moveY: 0, lookX: 0, lookY: 0, sprint: false, swingHeld: false, wallRunHeld: false,
@@ -21,6 +23,9 @@ export class GameWorld {
   private readonly listeners: Array<() => void> = [];
   private lastStatusAt = 0;
   private readonly demo: boolean;
+  private weatherMode: WeatherMode = "rain";
+  private showcase = false;
+  private readonly challenge: ChallengeManager;
 
   public constructor(
     private readonly scene: Scene,
@@ -29,8 +34,11 @@ export class GameWorld {
     private readonly player: PlayerController,
     private readonly camera: CameraRig,
     private readonly quality: QualityManager,
+    private readonly weather: WeatherSystem,
   ) {
     this.demo = new URLSearchParams(window.location.search).has("demo");
+    this.challenge = new ChallengeManager(scene);
+    this.weather.setDensity(this.quality.effectDensity);
     this.bindEvents();
     window.setTimeout(() => {
       if (this.phase !== "loading") return;
@@ -49,6 +57,8 @@ export class GameWorld {
   }
 
   public update(delta: number): void {
+    this.city.update(delta);
+    this.weather.update(this.player.root.position, delta);
     const raw = this.input.snapshot();
     if (this.phase === "selection") {
       if (raw.enterPressed) this.beginTraversal();
@@ -67,10 +77,15 @@ export class GameWorld {
       if (raw.pausePressed) this.togglePause();
       else if (raw.restartPressed) this.restart();
       else {
-        const actions = this.demo ? this.demoInput(delta) : raw;
+        const actions = this.showcase ? idleInput : (this.demo ? this.demoInput(delta) : raw);
         this.camera.look(actions.lookX, actions.lookY);
         this.player.update(actions, this.camera, this.city, delta, true);
+        this.camera.registerImpact(this.player.consumeImpact());
         this.camera.update(this.player.root.position, this.player.getSpeed(), this.city, delta, ["swing", "zip", "dive"].includes(this.player.traversal));
+        if (this.challenge.update(this.player.root.position, delta)) {
+          const progress = this.challenge.readout();
+          this.notification = progress.state === "complete" ? `Circuit clear: ${progress.elapsed.toFixed(1)} seconds.` : `Route node ${progress.node - 1}/${progress.total} captured.`;
+        }
       }
     } else if (this.phase === "paused") {
       if (raw.pausePressed || raw.enterPressed) this.togglePause();
@@ -80,6 +95,7 @@ export class GameWorld {
       if (this.transitionRemaining <= 0) this.restart();
     }
     this.quality.update(delta, (preset) => {
+      this.weather.setDensity(this.quality.effectDensity);
       this.notification = `Performance guard: ${preset.toUpperCase()} lattice.`;
       this.publishStatus(true);
     });
@@ -95,6 +111,7 @@ export class GameWorld {
     for (const unbind of this.listeners) unbind();
     this.input.dispose();
     this.player.dispose();
+    this.challenge.dispose();
     this.city.dispose();
   }
 
@@ -102,6 +119,7 @@ export class GameWorld {
     if (this.phase !== "selection") return;
     this.input.capturePointer();
     this.phase = "transition";
+    this.challenge.start();
     this.transitionRemaining = 0.78;
     this.player.root.rotation.set(0, 0.4, 0);
     this.notification = "Transit clearance granted.";
@@ -124,6 +142,7 @@ export class GameWorld {
   private restart(): void {
     if (!["playing", "paused", "recovery"].includes(this.phase)) return;
     this.player.reset();
+    this.challenge.reset();
     this.phase = "playing";
     this.notification = "Route re-entered at Sector Zero.";
     this.publishStatus(true);
@@ -138,6 +157,7 @@ export class GameWorld {
 
   private setQuality(preset: QualityPreset): void {
     this.quality.apply(preset);
+    this.weather.setDensity(this.quality.effectDensity);
     this.notification = `Quality lattice: ${preset.toUpperCase()}.`;
     this.publishStatus(true);
   }
@@ -145,6 +165,20 @@ export class GameWorld {
   private setReducedMotion(value: boolean): void {
     this.camera.setReducedMotion(value);
     this.notification = value ? "Reduced motion enabled." : "Cinematic damping restored.";
+    this.publishStatus(true);
+  }
+
+  private setWeather(value: WeatherMode): void {
+    this.weatherMode = value;
+    this.weather.setMode(value);
+    this.notification = value === "clear" ? "Dry visibility profile active." : `${value.toUpperCase()} weather lattice active.`;
+    this.publishStatus(true);
+  }
+
+  private setShowcase(value: boolean): void {
+    this.showcase = value;
+    this.camera.setShowcase(value);
+    this.notification = value ? "Showcase camera active. Traversal input held." : "Showcase released. Traversal input restored.";
     this.publishStatus(true);
   }
 
@@ -163,6 +197,9 @@ export class GameWorld {
       fps: Math.round(this.scene.getEngine().getFps()),
       notification: this.notification,
       menuHint: "WASD move · Space jump · LMB swing · RMB zip · Q wall-run · E dive",
+      weather: this.weatherMode,
+      showcase: this.showcase,
+      challenge: this.challenge.readout(),
     };
     window.dispatchEvent(new CustomEvent<GameStatus>("megapolis:status", { detail: status }));
   }
@@ -197,6 +234,8 @@ export class GameWorld {
     listen<CharacterId>("megapolis:character", (value) => this.setCharacter(value));
     listen<QualityPreset>("megapolis:quality", (value) => this.setQuality(value));
     listen<boolean>("megapolis:motion", (value) => this.setReducedMotion(value));
+    listen<WeatherMode>("megapolis:weather", (value) => this.setWeather(value));
+    listen<boolean>("megapolis:showcase", (value) => this.setShowcase(value));
     listen("megapolis:pause", () => this.togglePause());
     listen("megapolis:restart", () => this.restart());
   }

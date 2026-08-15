@@ -1,7 +1,7 @@
 // Aerial Transit Noir — edge-aligned flight instrumentation preserves the city’s central traversal field.
 import { useEffect, useState } from "react";
 import { Gauge, MousePointer2, Pause, Play, RotateCcw, Settings2, Zap } from "lucide-react";
-import type { CharacterId, GameStatus, QualityPreset } from "@/game/types";
+import type { CharacterId, GameStatus, QualityPreset, WeatherMode } from "@/game/types";
 
 const reference = "/manus-storage/cyberpunk-megapolis-reference_708450ea.png";
 const emblem = "/manus-storage/megapolis-emblem_cdc84c90.png";
@@ -10,6 +10,8 @@ const initial: GameStatus = {
   phase: "loading", character: "vanta", traversal: "idle", speed: 0, momentum: 0,
   target: "SCANNING", targetDistance: 0, quality: "high", fps: 0,
   notification: "Booting city lattice…", menuHint: "WASD move · Space jump · LMB swing · RMB zip · Q wall-run · E dive",
+  weather: "rain", showcase: false,
+  challenge: { route: "SKYRAIL CIRCUIT", state: "idle", node: 1, total: 5, target: "STREET LAUNCH", elapsed: 0, best: null },
 };
 
 function emit<T>(name: string, detail?: T): void {
@@ -20,6 +22,7 @@ export default function GameHUD() {
   const [status, setStatus] = useState<GameStatus>(initial);
   const [settings, setSettings] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [highContrast, setHighContrast] = useState(false);
 
   useEffect(() => {
     const update = (event: Event) => setStatus((event as CustomEvent<GameStatus>).detail);
@@ -31,7 +34,7 @@ export default function GameHUD() {
   const paused = status.phase === "paused";
 
   return (
-    <div className="game-hud" aria-live="polite">
+    <div className={`game-hud ${highContrast ? "high-contrast" : ""}`} aria-live="polite">
       <div className="hud-noise" />
       <div className="flight-cartography" aria-hidden="true">
         <span className="flight-line primary" />
@@ -69,22 +72,23 @@ export default function GameHUD() {
             <span className="state-chip">{status.traversal.toUpperCase()}</span>
           </section>
           <section className="mission-rail">
-            <span>SECTOR ZERO</span>
+            <span>{status.challenge.route} // {status.challenge.state.toUpperCase()}</span>
             <div className="route-line"><i /><i /><i /><i /></div>
-            <span className="route-state"><Zap size={13} /> LINK STABLE</span>
+            <span className="route-state"><Zap size={13} /> NODE {status.challenge.node}/{status.challenge.total} // {status.challenge.target}</span>
+            <span className="challenge-time">{status.challenge.elapsed.toFixed(1)}s {status.challenge.best === null ? "// NO BEST" : `// BEST ${status.challenge.best.toFixed(1)}s`}</span>
           </section>
           <p className="system-note">{status.notification}</p>
           <div className="reticle" aria-hidden="true"><i /><i /><i /><i /></div>
         </>
       )}
 
-      {inMenu && <MenuPanel status={status} onSettings={() => setSettings(!settings)} settings={settings} reducedMotion={reducedMotion} onMotion={(value) => { setReducedMotion(value); emit("megapolis:motion", value); }} />}
-      {paused && <PausePanel status={status} onSettings={() => setSettings(!settings)} settings={settings} reducedMotion={reducedMotion} onMotion={(value) => { setReducedMotion(value); emit("megapolis:motion", value); }} />}
+      {inMenu && <MenuPanel status={status} onSettings={() => setSettings(!settings)} settings={settings} reducedMotion={reducedMotion} highContrast={highContrast} onMotion={(value) => { setReducedMotion(value); emit("megapolis:motion", value); }} onContrast={setHighContrast} />}
+      {paused && <PausePanel status={status} onSettings={() => setSettings(!settings)} settings={settings} reducedMotion={reducedMotion} highContrast={highContrast} onMotion={(value) => { setReducedMotion(value); emit("megapolis:motion", value); }} onContrast={setHighContrast} />}
     </div>
   );
 }
 
-function MenuPanel({ status, onSettings, settings, reducedMotion, onMotion }: { status: GameStatus; onSettings: () => void; settings: boolean; reducedMotion: boolean; onMotion: (value: boolean) => void }) {
+function MenuPanel({ status, onSettings, settings, reducedMotion, highContrast, onMotion, onContrast }: { status: GameStatus; onSettings: () => void; settings: boolean; reducedMotion: boolean; highContrast: boolean; onMotion: (value: boolean) => void; onContrast: (value: boolean) => void }) {
   const selecting = status.phase === "selection";
   return (
     <main className="menu-shell" style={{ backgroundImage: `linear-gradient(90deg, rgba(3,8,18,.94) 0%, rgba(3,8,18,.72) 42%, rgba(3,8,18,.1) 78%), url(${reference})` }}>
@@ -111,12 +115,12 @@ function MenuPanel({ status, onSettings, settings, reducedMotion, onMotion }: { 
         <button className="settings-trigger" onClick={onSettings}><Settings2 size={15} /> SYSTEM SETTINGS</button>
         <span>QUALITY // {status.quality.toUpperCase()}</span>
       </div>
-      {settings && <SettingsPanel status={status} reducedMotion={reducedMotion} onMotion={onMotion} />}
+      {settings && <SettingsPanel status={status} reducedMotion={reducedMotion} highContrast={highContrast} onMotion={onMotion} onContrast={onContrast} />}
     </main>
   );
 }
 
-function PausePanel({ status, onSettings, settings, reducedMotion, onMotion }: { status: GameStatus; onSettings: () => void; settings: boolean; reducedMotion: boolean; onMotion: (value: boolean) => void }) {
+function PausePanel({ status, onSettings, settings, reducedMotion, highContrast, onMotion, onContrast }: { status: GameStatus; onSettings: () => void; settings: boolean; reducedMotion: boolean; highContrast: boolean; onMotion: (value: boolean) => void; onContrast: (value: boolean) => void }) {
   return (
     <main className="pause-screen">
       <div className="pause-card">
@@ -129,7 +133,7 @@ function PausePanel({ status, onSettings, settings, reducedMotion, onMotion }: {
         </div>
         <button className="settings-trigger" onClick={onSettings}><Settings2 size={15} /> SETTINGS</button>
       </div>
-      {settings && <SettingsPanel status={status} reducedMotion={reducedMotion} onMotion={onMotion} />}
+      {settings && <SettingsPanel status={status} reducedMotion={reducedMotion} highContrast={highContrast} onMotion={onMotion} onContrast={onContrast} />}
     </main>
   );
 }
@@ -143,14 +147,21 @@ function CharacterCard({ id, active, name, label, description }: { id: Character
   </button>;
 }
 
-function SettingsPanel({ status, reducedMotion, onMotion }: { status: GameStatus; reducedMotion: boolean; onMotion: (value: boolean) => void }) {
+function SettingsPanel({ status, reducedMotion, highContrast, onMotion, onContrast }: { status: GameStatus; reducedMotion: boolean; highContrast: boolean; onMotion: (value: boolean) => void; onContrast: (value: boolean) => void }) {
   const presets: QualityPreset[] = ["high", "medium", "low"];
+  const weather: WeatherMode[] = ["clear", "rain", "storm"];
   return <aside className="settings-card">
     <span className="eyebrow">SYSTEM LATTICE</span>
     <div className="quality-switch" role="group" aria-label="Quality preset">
       {presets.map((preset) => <button key={preset} className={status.quality === preset ? "active" : ""} onClick={() => emit<QualityPreset>("megapolis:quality", preset)}>{preset}</button>)}
     </div>
+    <span className="setting-label">WEATHER LATTICE</span>
+    <div className="quality-switch weather-switch" role="group" aria-label="Weather profile">
+      {weather.map((mode) => <button key={mode} className={status.weather === mode ? "active" : ""} onClick={() => emit<WeatherMode>("megapolis:weather", mode)}>{mode}</button>)}
+    </div>
     <label className="motion-toggle"><span>REDUCED MOTION</span><input type="checkbox" checked={reducedMotion} onChange={(event) => onMotion(event.target.checked)} /></label>
+    <label className="motion-toggle"><span>HIGH CONTRAST</span><input type="checkbox" checked={highContrast} onChange={(event) => onContrast(event.target.checked)} /></label>
+    <label className="motion-toggle"><span>SHOWCASE CAMERA</span><input type="checkbox" checked={status.showcase} onChange={(event) => emit<boolean>("megapolis:showcase", event.target.checked)} /></label>
     <small>Auto fallback protects frame time during dense traversal.</small>
   </aside>;
 }

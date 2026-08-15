@@ -5,6 +5,8 @@ export type GamePhase = "loading" | "selection" | "transition" | "playing" | "pa
 export type TraversalState = "idle" | "run" | "sprint" | "jump" | "fall" | "swing" | "zip" | "wall-run" | "dive" | "landing" | "recovery";
 export type QualityPreset = "high" | "medium" | "low";
 export type CharacterId = "vanta" | "kite";
+export type WeatherMode = "clear" | "rain" | "storm";
+export type ChallengeState = "idle" | "active" | "complete";
 
 export interface Aabb {
   min: Vector3;
@@ -15,6 +17,16 @@ export interface Anchor {
   id: string;
   position: Vector3;
   kind: "roof" | "rail" | "bridge" | "spire";
+}
+
+export interface ChallengeReadout {
+  route: string;
+  state: ChallengeState;
+  node: number;
+  total: number;
+  target: string;
+  elapsed: number;
+  best: number | null;
 }
 
 export interface GameStatus {
@@ -29,6 +41,9 @@ export interface GameStatus {
   fps: number;
   notification: string;
   menuHint: string;
+  weather: WeatherMode;
+  showcase: boolean;
+  challenge: ChallengeReadout;
 }
 
 export interface InputSnapshot {
