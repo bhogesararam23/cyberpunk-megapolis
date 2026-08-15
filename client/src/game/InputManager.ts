@@ -9,7 +9,7 @@ export class InputManager {
   private readonly onKeyDown = (event: KeyboardEvent) => {
     const action = this.actionForKey(event.code);
     if (!action) return;
-    if (["jump", "pause", "restart", "enter"].includes(action) && !event.repeat) this.pressed.add(action);
+    if (["jump", "pause", "restart", "enter", "map"].includes(action) && !event.repeat) this.pressed.add(action);
     this.held.add(action);
     if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.code)) event.preventDefault();
   };
@@ -74,6 +74,7 @@ export class InputManager {
       pausePressed: this.pressed.has("pause"),
       restartPressed: this.pressed.has("restart"),
       enterPressed: this.pressed.has("enter"),
+      mapPressed: this.pressed.has("map"),
     };
   }
 
@@ -119,7 +120,7 @@ export class InputManager {
     const actions: Record<string, string> = {
       KeyW: "forward", KeyS: "back", KeyA: "left", KeyD: "right",
       ShiftLeft: "sprint", ShiftRight: "sprint", Space: "jump", KeyQ: "wallrun",
-      KeyE: "dive", Escape: "pause", KeyR: "restart", Enter: "enter",
+      KeyE: "dive", Escape: "pause", KeyR: "restart", Enter: "enter", KeyM: "map",
     };
     return actions[code] ?? null;
   }

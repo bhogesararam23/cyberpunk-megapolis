@@ -23,11 +23,14 @@ describe("camera rig traversal resilience", () => {
       }
       rig.setReducedMotion(true);
       rig.setShowcase(true);
-      rig.update(position, 0, city, 1 / 30, false);
+      rig.setPhotoOptions({ orbitDistance: 14, orbitSpeed: 0.45, fov: 0.72 });
+      for (let frame = 0; frame < 90; frame += 1) rig.update(position, 0, city, 1 / 30, false);
 
       expect([rig.camera.position.x, rig.camera.position.y, rig.camera.position.z, rig.camera.fov, rig.camera.rotation.z].every(Number.isFinite)).toBe(true);
       expect(rig.camera.fov).toBeGreaterThan(0.5);
       expect(rig.camera.fov).toBeLessThan(1.3);
+      expect(rig.camera.fov).toBeCloseTo(0.72, 2);
+      expect(Vector3.Distance(rig.camera.position, position)).toBeGreaterThan(12);
     } finally {
       rig.camera.dispose();
       city.dispose();

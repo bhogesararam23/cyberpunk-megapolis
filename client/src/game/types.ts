@@ -9,6 +9,7 @@ export type CharacterId = "vanta" | "kite";
 export type WeatherMode = "clear" | "rain" | "storm";
 export type ChallengeState = "idle" | "active" | "complete";
 export type DistrictId = "commercial-arcade" | "foundry" | "vertical-market" | "civic-core";
+export type NavigationKind = "district" | "landmark" | "route" | "vertical";
 
 export interface Aabb {
   min: Vector3;
@@ -63,6 +64,58 @@ export interface DiagnosticReadout {
   target: string;
 }
 
+/** A city-owned coordinate used by the tactical map, route starts, and guided traversal. */
+export interface CityNavigationNode {
+  id: string;
+  label: string;
+  district: DistrictId;
+  kind: NavigationKind;
+  position: Vector3;
+}
+
+export interface NavigationMarkerReadout {
+  id: string;
+  label: string;
+  district: DistrictId;
+  kind: NavigationKind;
+  x: number;
+  z: number;
+  discovered: boolean;
+  selected: boolean;
+}
+
+export interface NavigationReadout {
+  visible: boolean;
+  player: { x: number; z: number };
+  waypoint: { id: string; label: string; district: DistrictId; kind: NavigationKind; distance: number; bearing: number } | null;
+  markers: NavigationMarkerReadout[];
+}
+
+export interface ObjectiveReadout {
+  id: string;
+  label: string;
+  state: "idle" | "active" | "locked" | "complete";
+  instruction: string;
+  unlockLabel: string | null;
+  progress: number;
+  reward: number;
+  elapsed: number;
+  limit: number;
+  best: number | null;
+  completed: number;
+  total: number;
+}
+
+/** Runtime-only controls for the in-world photo deck; these do not create a separate scene or simulation. */
+export interface PhotoReadout {
+  active: boolean;
+  hudHidden: boolean;
+  orbitDistance: number;
+  orbitSpeed: number;
+  fov: number;
+  environment: string;
+}
+
 export interface GameStatus {
   phase: GamePhase;
   character: CharacterId;
@@ -80,12 +133,15 @@ export interface GameStatus {
   menuHint: string;
   weather: WeatherMode;
   showcase: boolean;
+  photo: PhotoReadout;
   challenge: ChallengeReadout;
   progression: ProgressReadout;
   settings: GameplaySettings;
   sectors: SectorReadout;
   diagnostics: DiagnosticReadout;
   diagnosticsVisible: boolean;
+  navigation: NavigationReadout;
+  objective: ObjectiveReadout;
 }
 
 export interface InputSnapshot {
@@ -103,4 +159,5 @@ export interface InputSnapshot {
   pausePressed: boolean;
   restartPressed: boolean;
   enterPressed: boolean;
+  mapPressed: boolean;
 }

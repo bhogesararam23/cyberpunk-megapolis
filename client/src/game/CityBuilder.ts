@@ -2,11 +2,29 @@
 import {
   Color3, Matrix, Mesh, MeshBuilder, Quaternion, StandardMaterial, Texture, TransformNode, Vector3,
 } from "@babylonjs/core";
-import type { Aabb, Anchor, DistrictId } from "./types";
+import type { Aabb, Anchor, CityNavigationNode, DistrictId } from "./types";
 
 const CYAN = Color3.FromHexString("#43f6e8");
 const AMBER = Color3.FromHexString("#f6a84d");
 const INK = Color3.FromHexString("#091324");
+
+/** Canonical city coordinates for the tactical atlas, objective starts, and guided traversal. */
+const NAVIGATION_NODES: CityNavigationNode[] = [
+  { id: "civic-core", label: "CIVIC TRANSFER CORE", district: "civic-core", kind: "district", position: new Vector3(-32, 20, -38) },
+  { id: "commercial-arcade", label: "COMMERCIAL ARCADE", district: "commercial-arcade", kind: "district", position: new Vector3(57, 12, -59) },
+  { id: "foundry", label: "INDUSTRIAL FOUNDRY", district: "foundry", kind: "district", position: new Vector3(-84, 14, 77) },
+  { id: "vertical-market", label: "VERTICAL MARKET", district: "vertical-market", kind: "district", position: new Vector3(37, 16, 98) },
+  { id: "arcade-portal", label: "SPECTRUM PORTAL", district: "commercial-arcade", kind: "landmark", position: new Vector3(57, 12, -59) },
+  { id: "foundry-breath", label: "FOUNDRY BREATH", district: "foundry", kind: "landmark", position: new Vector3(-84, 16, 77) },
+  { id: "market-spine", label: "MARKET SPINE", district: "vertical-market", kind: "landmark", position: new Vector3(34, 20, 98) },
+  { id: "civic-crown", label: "CIVIC CROWN", district: "civic-core", kind: "landmark", position: new Vector3(-32, 52, -38) },
+  { id: "north-rail", label: "NORTH RAIL", district: "vertical-market", kind: "landmark", position: new Vector3(-38, 23, 82) },
+  { id: "waterline", label: "WATERLINE DECK", district: "commercial-arcade", kind: "landmark", position: new Vector3(88, 11, 18) },
+  { id: "route-skyrail", label: "SKYRAIL CIRCUIT START", district: "civic-core", kind: "route", position: new Vector3(0, 5, 22) },
+  { id: "route-market", label: "MARKET DROP START", district: "vertical-market", kind: "route", position: new Vector3(32, 12, 94) },
+  { id: "route-foundry", label: "FOUNDRY ELEVATION START", district: "foundry", kind: "route", position: new Vector3(-85, 7, 76) },
+  { id: "market-ascent", label: "MARKET ASCENT", district: "vertical-market", kind: "vertical", position: new Vector3(37, 26, 97) },
+];
 
 export class CityBuilder {
   public readonly collisions: Aabb[] = [];
@@ -88,6 +106,11 @@ export class CityBuilder {
       actuator.mesh.scaling.y += (target - actuator.mesh.scaling.y) * 0.15;
       actuator.mesh.visibility = actuator.district === district ? 0.72 + intensity * 0.28 : 0.5;
     }
+  }
+
+  /** Cloned read-only descriptors prevent UI and objective code from mutating city geometry coordinates. */
+  public getNavigationNodes(): CityNavigationNode[] {
+    return NAVIGATION_NODES.map((node) => ({ ...node, position: node.position.clone() }));
   }
 
   public getSurfaceHeight(x: number, z: number): number {

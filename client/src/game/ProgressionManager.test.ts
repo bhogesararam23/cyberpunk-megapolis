@@ -15,7 +15,7 @@ describe("persistent city progression", () => {
     progression.dispose(); scene.dispose(); engine.dispose();
   });
 
-  it("rotates to a new contract after a completed route", () => {
+  it("rotates to a new contract and waits for a physical route start", () => {
     const engine = new NullEngine();
     const scene = new Scene(engine);
     const challenge = new ChallengeManager(scene);
@@ -27,7 +27,9 @@ describe("persistent city progression", () => {
     }
     expect(challenge.readout().state).toBe("complete");
     challenge.nextRoute();
-    expect(challenge.readout()).toMatchObject({ route: "MARKET DROP", state: "active", node: 1, total: 5 });
+    expect(challenge.readout()).toMatchObject({ route: "MARKET DROP", state: "idle", node: 1, total: 5 });
+    challenge.start();
+    expect(challenge.readout().state).toBe("active");
     challenge.dispose(); scene.dispose(); engine.dispose();
   });
 });

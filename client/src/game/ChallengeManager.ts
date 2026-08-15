@@ -39,14 +39,16 @@ export class ChallengeManager {
   }
 
   public start(): void { this.nodeIndex = 0; this.elapsed = 0; this.running = true; this.completed = false; this.refreshMarkers(); }
-  public reset(): void { this.start(); }
+  /** Shows a route's physical start beacon without starting the clock. */
+  public arm(): void { this.nodeIndex = 0; this.elapsed = 0; this.running = false; this.completed = false; this.refreshMarkers(); }
+  public reset(): void { this.arm(); }
 
   public nextRoute(): void {
     this.routeIndex = (this.routeIndex + 1) % ROUTES.length;
     this.bestTime = this.bestTimes[ROUTES[this.routeIndex].label] ?? null;
     while (this.nodes.length) this.nodes.pop()?.marker.dispose();
     this.populateRoute();
-    this.start();
+    this.arm();
   }
 
   public update(playerPosition: Vector3, delta: number): boolean {

@@ -14,12 +14,13 @@ interface Landmark {
 
 interface StoredProfile {
   discoveries: string[];
+  objectives: string[];
   credits: number;
   totalDistance: number;
   longestRun: number;
 }
 
-const DEFAULT_PROFILE: StoredProfile = { discoveries: [], credits: 0, totalDistance: 0, longestRun: 0 };
+const DEFAULT_PROFILE: StoredProfile = { discoveries: [], objectives: [], credits: 0, totalDistance: 0, longestRun: 0 };
 
 export class ProgressionManager {
   private readonly root: TransformNode;
@@ -85,6 +86,20 @@ export class ProgressionManager {
     };
   }
 
+  /** Returns a copy for objective and navigation systems without exposing the persisted profile. */
+  public getDiscoveries(): string[] { return [...this.profile.discoveries]; }
+
+  /** Awards the first completion only; repeat play still keeps a separate best-time record. */
+  public completeObjective(id: string, reward: number): boolean {
+    if (this.profile.objectives.includes(id)) return false;
+    this.profile.objectives.push(id);
+    this.profile.credits += Math.max(0, Math.round(reward));
+    this.save();
+    return true;
+  }
+
+  public getObjectives(): string[] { return [...this.profile.objectives]; }
+
   public dispose(): void {
     this.save();
     this.root.dispose(false, true);
@@ -120,7 +135,7 @@ export class ProgressionManager {
   private load(): StoredProfile {
     try {
       const parsed = JSON.parse(window.localStorage.getItem(PROFILE_KEY) ?? "null") as Partial<StoredProfile> | null;
-      return { discoveries: Array.isArray(parsed?.discoveries) ? parsed.discoveries.filter((item): item is string => typeof item === "string") : [], credits: Number.isFinite(parsed?.credits) ? Number(parsed?.credits) : 0, totalDistance: Number.isFinite(parsed?.totalDistance) ? Number(parsed?.totalDistance) : 0, longestRun: Number.isFinite(parsed?.longestRun) ? Number(parsed?.longestRun) : 0 };
+      return { discoveries: Array.isArray(parsed?.discoveries) ? parsed.discoveries.filter((item): item is string => typeof item === "string") : [], objectives: Array.isArray(parsed?.objectives) ? parsed.objectives.filter((item): item is string => typeof item === "string") : [], credits: Number.isFinite(parsed?.credits) ? Number(parsed?.credits) : 0, totalDistance: Number.isFinite(parsed?.totalDistance) ? Number(parsed?.totalDistance) : 0, longestRun: Number.isFinite(parsed?.longestRun) ? Number(parsed?.longestRun) : 0 };
     } catch { return { ...DEFAULT_PROFILE }; }
   }
 

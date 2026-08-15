@@ -20,6 +20,9 @@ export class CameraRig {
   private traversalEnergy = 0;
   private chainBias = 0;
   private sideLead = 0;
+  private photoDistance = 10.5;
+  private photoOrbitSpeed = 0.15;
+  private photoFov = 0.9;
 
   public constructor(scene: import("@babylonjs/core").Scene, canvas: HTMLCanvasElement) {
     this.camera = new UniversalCamera("chase-camera", new Vector3(0, 5, -12), scene);
@@ -31,6 +34,11 @@ export class CameraRig {
 
   public setReducedMotion(value: boolean): void { this.reducedMotion = value; }
   public setShowcase(value: boolean): void { this.showcase = value; }
+  public setPhotoOptions(options: { orbitDistance?: number; orbitSpeed?: number; fov?: number }): void {
+    if (options.orbitDistance !== undefined) this.photoDistance = Math.max(5, Math.min(18, options.orbitDistance));
+    if (options.orbitSpeed !== undefined) this.photoOrbitSpeed = Math.max(0, Math.min(0.75, options.orbitSpeed));
+    if (options.fov !== undefined) this.photoFov = Math.max(0.58, Math.min(1.2, options.fov));
+  }
 
   public setPreferences(preferences: { sensitivity: number; invertY: boolean; screenShake: boolean; fov: number }): void {
     this.sensitivity = preferences.sensitivity;
@@ -65,7 +73,7 @@ export class CameraRig {
 
   public update(playerPosition: Vector3, speed: number, city: CityBuilder, delta: number, dramatic = false): void {
     if (this.showcase && !this.reducedMotion) {
-      this.yaw += delta * 0.15;
+      this.yaw += delta * this.photoOrbitSpeed;
       this.pitch += (-0.08 - this.pitch) * Math.min(1, delta * 1.6);
     }
     const forward = this.getForward();
@@ -76,13 +84,14 @@ export class CameraRig {
     this.traversalEnergy = Math.max(0, this.traversalEnergy - delta * 1.45);
     this.sideLead += (0 - this.sideLead) * Math.min(1, delta * 2.8);
     const speedRatio = Math.min(1, speed / 38);
-    const distance = 8.5 + Math.min(6.2, speed * 0.15) + (dramatic ? 1.5 : 0);
+    const distance = this.showcase ? this.photoDistance : 8.5 + Math.min(6.2, speed * 0.15) + (dramatic ? 1.5 : 0);
     const anticipation = Math.min(11.6, 5.2 + speed * 0.14);
     const verticalLead = Math.max(-1.8, Math.min(2.8, this.verticalVelocity * 0.05));
     const lateral = Vector3.Cross(new Vector3(0, 1, 0), forward).normalize().scale(this.sideLead * (0.7 + speedRatio * 0.9));
     const target = playerPosition.add(new Vector3(0, 1.65 + verticalLead + this.traversalEnergy * 0.34, 0)).add(forward.scale(anticipation + this.chainBias * 1.8)).add(lateral);
-    const orbitOffset = this.showcase ? new Vector3(Math.cos(this.yaw) * 4.8, 1.65, -Math.sin(this.yaw) * 4.8) : Vector3.Zero();
-    const desired = playerPosition.add(new Vector3(0, 3.4 + (dramatic ? 1.5 : 0) + speedRatio * 1.1 + this.traversalEnergy * 0.36, 0)).subtract(forward.scale(distance + this.chainBias * 1.1)).add(orbitOffset).add(lateral.scale(0.28));
+    const desired = this.showcase
+      ? playerPosition.add(new Vector3(Math.cos(this.yaw) * distance, 4.2 + Math.sin(this.yaw * 0.72) * 1.4, Math.sin(this.yaw) * distance))
+      : playerPosition.add(new Vector3(0, 3.4 + (dramatic ? 1.5 : 0) + speedRatio * 1.1 + this.traversalEnergy * 0.36, 0)).subtract(forward.scale(distance + this.chainBias * 1.1)).add(lateral.scale(0.28));
     const safePosition = city.resolveCameraPath(target, desired);
     const damping = this.reducedMotion ? 1 : 1 - Math.exp(-delta * (this.showcase ? 4.5 : dramatic ? 11 : 8));
     this.camera.position = Vector3.Lerp(this.camera.position, safePosition, damping);
@@ -90,6 +99,7 @@ export class CameraRig {
     const desiredRoll = this.reducedMotion || this.showcase ? 0 : Math.max(-0.085, Math.min(0.085, -displacement.x * 0.018 + forward.x * speedRatio * 0.035));
     this.cameraRoll += (desiredRoll - this.cameraRoll) * Math.min(1, delta * 7);
     this.camera.rotation.z = this.cameraRoll + (this.reducedMotion ? 0 : Math.sin(performance.now() * 0.033) * this.impact * 0.018);
-    this.camera.fov += ((this.baseFov - 0.12 + Math.min(0.12, speed / 320) + (dramatic ? 0.014 : 0) + this.traversalEnergy * 0.022 + (this.showcase ? 0.035 : 0)) - this.camera.fov) * Math.min(1, delta * 6);
+    const desiredFov = this.showcase ? this.photoFov : this.baseFov - 0.12 + Math.min(0.12, speed / 320) + (dramatic ? 0.014 : 0) + this.traversalEnergy * 0.022;
+    this.camera.fov += (desiredFov - this.camera.fov) * Math.min(1, delta * 6);
   }
 }

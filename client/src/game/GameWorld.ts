@@ -7,6 +7,8 @@ import type { CameraRig } from "./CameraRig";
 import { ChallengeManager } from "./ChallengeManager";
 import type { CityBuilder } from "./CityBuilder";
 import { InputManager } from "./InputManager";
+import { NavigationManager } from "./NavigationManager";
+import { ObjectiveManager, type ObjectiveEvent } from "./ObjectiveManager";
 import { PlayerController } from "./PlayerController";
 import { ProgressionManager } from "./ProgressionManager";
 import { QualityManager } from "./QualityManager";
@@ -20,7 +22,7 @@ import type { CharacterId, GamePhase, GameStatus, InputSnapshot, QualityPreset, 
 const idleInput: InputSnapshot = {
   moveX: 0, moveY: 0, lookX: 0, lookY: 0, sprint: false, swingHeld: false, wallRunHeld: false,
   diveHeld: false, jumpPressed: false, swingPressed: false, zipPressed: false, pausePressed: false,
-  restartPressed: false, enterPressed: false,
+  restartPressed: false, enterPressed: false, mapPressed: false,
 };
 
 export class GameWorld {
@@ -34,8 +36,11 @@ export class GameWorld {
   private readonly demo: boolean;
   private weatherMode: WeatherMode = "rain";
   private showcase = false;
+  private photo = { hudHidden: false, orbitDistance: 10.5, orbitSpeed: 0.15, fov: 0.9 };
   private readonly challenge: ChallengeManager;
   private readonly progression: ProgressionManager;
+  private readonly navigation: NavigationManager;
+  private readonly objectives: ObjectiveManager;
   private settings: GameplaySettings;
   private readonly audio: AudioManager;
   private readonly signals = new GameSignalBus();
@@ -59,6 +64,8 @@ export class GameWorld {
     this.demo = new URLSearchParams(window.location.search).has("demo");
     this.challenge = new ChallengeManager(scene);
     this.progression = new ProgressionManager(scene);
+    this.navigation = new NavigationManager(city);
+    this.objectives = new ObjectiveManager(scene, city, this.progression.getObjectives());
     this.settings = loadSettings();
     this.audio = new AudioManager(this.settings);
     this.simulation = new SimulationDirector(this.ambient, this.signals, this.city);
@@ -108,7 +115,8 @@ export class GameWorld {
       if (raw.pausePressed) this.togglePause();
       else if (raw.restartPressed) this.restart();
       else {
-        const actions = this.showcase ? idleInput : (this.demo ? this.demoInput(delta) : raw);
+        if (raw.mapPressed) this.setMapVisible(!this.navigation.isVisible);
+        const actions = this.showcase || this.navigation.isVisible ? idleInput : (this.demo ? this.demoInput(delta) : raw);
         this.camera.look(actions.lookX, actions.lookY);
         this.player.update(actions, this.camera, this.city, delta, true);
         this.audio.update(this.player.getSpeed(), this.player.traversal, this.weatherMode, delta);
@@ -119,11 +127,20 @@ export class GameWorld {
         if (simulation.notification) this.notification = simulation.notification;
         this.telemetry.update(this.scene, delta, { district: simulation.sectors.district, traversal: this.player.traversal, speed: this.player.getSpeed(), target: this.player.target?.id ?? "SCANNING", activeActors: simulation.activeActors, activeSectors: simulation.sectors.active.length + simulation.sectors.predicted.length });
         const discovery = this.progression.update(this.player.root.position, this.player.getSpeed(), delta);
-        if (discovery) { this.notification = discovery; this.audio.cue("discover"); }
+        const discoveries = this.progression.getDiscoveries();
+        const unlock = this.objectives.syncUnlocks(discoveries);
+        if (discovery) { this.notification = unlock ? `${discovery} ${unlock}` : discovery; this.audio.cue("discover"); }
+        this.navigation.update(this.player.root.position, discoveries);
+        const objectiveEvent = this.objectives.update(this.player.root.position, this.player.traversal, this.player.getChain(), discoveries, delta);
+        if (objectiveEvent) this.handleObjectiveEvent(objectiveEvent);
         if (this.challenge.update(this.player.root.position, delta)) {
           const progress = this.challenge.readout();
           this.notification = progress.state === "complete" ? `Circuit clear: ${progress.elapsed.toFixed(1)} seconds.` : `Route node ${progress.node - 1}/${progress.total} captured.`;
           this.audio.cue("route");
+          if (progress.state === "complete") {
+            const routeObjective = this.objectives.completeRoute();
+            if (routeObjective) this.handleObjectiveEvent(routeObjective);
+          }
         }
       }
     } else if (this.phase === "paused") {
@@ -153,6 +170,7 @@ export class GameWorld {
     this.input.dispose();
     this.player.dispose();
     this.challenge.dispose();
+    this.objectives.dispose();
     this.progression.dispose();
     this.audio.dispose();
     this.signals.clear();
@@ -171,8 +189,11 @@ export class GameWorld {
     this.audio.activate();
     this.audio.cue("launch");
     this.phase = "transition";
-    this.challenge.start();
+    this.challenge.arm();
+    this.objectives.resetRun();
     this.progression.resetRun();
+    this.navigation.setVisible(false);
+    this.navigation.update(this.player.root.position, this.progression.getDiscoveries());
     this.transitionRemaining = 0.78;
     this.player.root.rotation.set(0, 0.4, 0);
     this.notification = "Transit clearance granted.";
@@ -203,6 +224,8 @@ export class GameWorld {
     if (completedRoute) this.challenge.nextRoute();
     else this.challenge.reset();
     this.progression.resetRun();
+    this.objectives.resetRun();
+    this.navigation.setVisible(false);
     this.phase = "playing";
     this.notification = completedRoute ? `New contract live: ${this.challenge.readout().route}.` : "Route re-entered at Sector Zero.";
     this.publishStatus(true);
@@ -257,8 +280,50 @@ export class GameWorld {
   private setShowcase(value: boolean): void {
     this.showcase = value;
     this.camera.setShowcase(value);
-    this.notification = value ? "Showcase camera active. Traversal input held." : "Showcase released. Traversal input restored.";
+    if (value) {
+      this.input.reset();
+      if (document.pointerLockElement) document.exitPointerLock();
+      this.camera.setPhotoOptions(this.photo);
+    } else this.photo.hudHidden = false;
+    this.notification = value ? "Photo deck active. Traversal input held; orbit controls live." : "Showcase released. Traversal input restored.";
     this.publishStatus(true);
+  }
+
+  private setPhoto(value: Partial<typeof this.photo>): void {
+    this.photo = { ...this.photo, ...value };
+    this.camera.setPhotoOptions(this.photo);
+    this.notification = this.photo.hudHidden ? "Photo frame clean. Use the photo deck to restore instruments." : "Photo composition recalibrated.";
+    this.publishStatus(true);
+  }
+
+  private setMapVisible(value: boolean): void {
+    this.navigation.setVisible(value);
+    this.notification = value ? "Tactical atlas open. Select a city signal or press M to close." : "Tactical atlas stowed.";
+    this.publishStatus(true);
+  }
+
+  private setWaypoint(id: string): void {
+    if (!this.navigation.select(id)) return;
+    const waypoint = this.navigation.readout().waypoint;
+    this.notification = waypoint ? `Waypoint engaged: ${waypoint.label} // ${waypoint.distance}m.` : "Waypoint unavailable.";
+    this.publishStatus(true);
+  }
+
+  private handleObjectiveEvent(event: ObjectiveEvent): void {
+    if (event.type === "started") {
+      if (event.kind === "route") this.challenge.start();
+      this.notification = `${event.label} // active. ${event.kind === "route" ? "Clock armed." : "Objective signal acquired."}`;
+      this.audio.cue("route");
+      return;
+    }
+    if (event.type === "failed") {
+      this.notification = `${event.label} // signal lost. Return to the start beacon.`;
+      this.audio.cue("pause");
+      return;
+    }
+    const newReward = this.progression.completeObjective(event.id, event.reward);
+    this.notification = `${event.label} complete // +${newReward ? event.reward : 0} signal // ${event.elapsed.toFixed(1)}s.`;
+    this.audio.cue("discover");
   }
 
   private setSettings(value: GameplaySettings): void {
@@ -297,12 +362,15 @@ export class GameWorld {
       menuHint: "WASD move · Space jump · LMB swing · RMB zip · Q wall-run · E dive",
       weather: this.weatherMode,
       showcase: this.showcase,
+      photo: { active: this.showcase, ...this.photo, environment: `${this.timeOfDay.readout.phase.toUpperCase()} // ${this.weatherMode.toUpperCase()}` },
       challenge: this.challenge.readout(),
       progression: this.progression.readout(),
       settings: this.settings,
       sectors: this.sectors,
       diagnostics: this.telemetry.snapshot,
       diagnosticsVisible: this.diagnosticsVisible,
+      navigation: this.navigation.readout(),
+      objective: this.objectives.readout(),
     };
     window.dispatchEvent(new CustomEvent<GameStatus>("megapolis:status", { detail: status }));
   }
@@ -339,9 +407,12 @@ export class GameWorld {
     listen<boolean>("megapolis:motion", (value) => this.setReducedMotion(value));
     listen<WeatherMode>("megapolis:weather", (value) => this.setWeather(value));
     listen<boolean>("megapolis:showcase", (value) => this.setShowcase(value));
+    listen<Partial<typeof this.photo>>("megapolis:photo", (value) => this.setPhoto(value ?? {}));
     listen<GameplaySettings>("megapolis:settings", (value) => this.setSettings(value));
     listen<boolean>("megapolis:contrast", (value) => this.setContrast(value));
     listen<boolean>("megapolis:diagnostics", (value) => { this.diagnosticsVisible = value; this.notification = value ? "Telemetry lattice visible." : "Telemetry lattice hidden."; this.publishStatus(true); });
+    listen<boolean>("megapolis:map", (value) => this.setMapVisible(value));
+    listen<string>("megapolis:waypoint", (id) => this.setWaypoint(id));
     listen("megapolis:pause", () => this.togglePause());
     listen("megapolis:restart", () => this.restart());
   }
