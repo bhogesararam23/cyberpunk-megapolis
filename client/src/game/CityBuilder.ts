@@ -2,6 +2,7 @@
 import {
   Color3, Matrix, Mesh, MeshBuilder, Quaternion, StandardMaterial, Texture, TransformNode, Vector3,
 } from "@babylonjs/core";
+import { megapolisAsset } from "./megapolisAssets";
 import type { Aabb, Anchor, CityNavigationNode, DistrictId } from "./types";
 
 const CYAN = Color3.FromHexString("#43f6e8");
@@ -55,19 +56,19 @@ export class CityBuilder {
     this.cyanLight = this.material("signal-cyan", Color3.FromHexString("#103b43"), CYAN.scale(0.72));
     this.amberLight = this.material("signal-amber", Color3.FromHexString("#4b2d12"), AMBER.scale(0.74));
     this.facade = this.material("facade-atlas", Color3.FromHexString("#1d2c42"), Color3.FromHexString("#172940"));
-    const facadeAtlas = new Texture("/manus-storage/city-facade-atlas_ad18a2d6.png", scene);
+    const facadeAtlas = new Texture(megapolisAsset("facade"), scene);
     facadeAtlas.uScale = 1.5;
     facadeAtlas.vScale = 2.4;
     this.facade.diffuseTexture = facadeAtlas;
     this.facade.emissiveTexture = facadeAtlas;
     this.facade.emissiveColor = Color3.FromHexString("#142235");
     this.signDecal = this.material("sign-atlas", Color3.FromHexString("#16414c"), CYAN.scale(0.62));
-    const signAtlas = new Texture("/manus-storage/neon-sign-atlas_fe673f95.png", scene);
+    const signAtlas = new Texture(megapolisAsset("sign"), scene);
     this.signDecal.diffuseTexture = signAtlas;
     this.signDecal.emissiveTexture = signAtlas;
     this.signDecal.emissiveColor = Color3.FromHexString("#23656e");
     this.transitDecal = this.material("vnext-transit-wayfinding", Color3.FromHexString("#163947"), CYAN.scale(0.68));
-    const transitAtlas = new Texture("/manus-storage/vnext-transit-signage-atlas_414d8bd0.png", scene);
+    const transitAtlas = new Texture(megapolisAsset("transit"), scene);
     this.transitDecal.diffuseTexture = transitAtlas;
     this.transitDecal.emissiveTexture = transitAtlas;
     this.transitDecal.emissiveColor = Color3.FromHexString("#185c67");
@@ -483,7 +484,7 @@ export class CityBuilder {
 
   private createSkylinePerimeter(): void {
     const panoramaMaterial = this.material("distant-panorama", Color3.FromHexString("#172640"), Color3.FromHexString("#0a2137"));
-    const panorama = new Texture("/manus-storage/skyline-panorama_27c9972a.png", this.scene);
+    const panorama = new Texture(megapolisAsset("skyline"), this.scene);
     panoramaMaterial.diffuseTexture = panorama;
     panoramaMaterial.emissiveTexture = panorama;
     panoramaMaterial.emissiveColor = Color3.FromHexString("#214c65");

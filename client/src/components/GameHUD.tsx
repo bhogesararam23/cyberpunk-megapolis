@@ -1,10 +1,12 @@
 // Aerial Transit Noir — edge-aligned flight instrumentation preserves the city’s central traversal field.
 import { useEffect, useState } from "react";
 import { Compass, Gauge, Map, MousePointer2, Pause, Play, RotateCcw, Settings2, Zap } from "lucide-react";
+import { megapolisAsset } from "@/game/megapolisAssets";
 import type { CharacterId, GameStatus, QualityPreset, WeatherMode } from "@/game/types";
 
-const reference = "/manus-storage/cyberpunk-megapolis-reference_708450ea.png";
-const emblem = "/manus-storage/megapolis-emblem_cdc84c90.png";
+// Aerial Transit Noir — launch art resolves through the host-neutral asset manifest.
+const reference = megapolisAsset("reference");
+const emblem = megapolisAsset("emblem");
 
 const initial: GameStatus = {
   phase: "loading", character: "vanta", characterTrait: "KINETIC WEAVE // longer line tolerance and stronger release momentum", traversal: "idle", speed: 0, momentum: 0, chain: 0,

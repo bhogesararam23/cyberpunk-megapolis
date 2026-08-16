@@ -203,10 +203,13 @@ function vitePluginStorageProxy(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector(), vitePluginStorageProxy()];
-
-export default defineConfig({
-  plugins,
+export default defineConfig(({ command }) => ({
+  // Production builds remain a portable Vite bundle; Manus observability and storage middleware are development-only.
+  plugins: [
+    react(),
+    tailwindcss(),
+    ...(command === "serve" ? [jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector(), vitePluginStorageProxy()] : []),
+  ],
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),
@@ -238,4 +241,4 @@ export default defineConfig({
       deny: ["**/.*"],
     },
   },
-});
+}));
