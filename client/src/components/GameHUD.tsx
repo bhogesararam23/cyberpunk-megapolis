@@ -20,6 +20,7 @@ const initial: GameStatus = {
   diagnosticsVisible: false,
   navigation: { visible: false, player: { x: 0, z: 0 }, waypoint: null, markers: [] },
   objective: { id: "skyrail-relay", label: "SKYRAIL RELAY", state: "idle", instruction: "ENTER THE SKYRAIL CIRCUIT", unlockLabel: null, progress: 0, reward: 180, elapsed: 0, limit: 58, best: null, completed: 0, total: 3 },
+  flow: { state: "idle", steps: 0, target: 4, window: 0, lastAction: "STANDBY", best: 0, completed: 0 },
 };
 
 function emit<T>(name: string, detail?: T): void {
@@ -102,6 +103,7 @@ export default function GameHUD() {
             <span className="discovery-state">{status.progression.discoveries}/{status.progression.discoveryTotal} CHARTED // {status.progression.credits} SIG // NEXT {status.progression.nextLandmark}</span>
           </section>
           <section className={`objective-rail ${status.objective.state}`} aria-label="Current traversal objective"><span>LOCAL OBJECTIVE // {status.objective.completed}/{status.objective.total}</span><strong>{status.objective.label} // {status.objective.state.toUpperCase()}</strong><small>{status.objective.instruction}{status.objective.unlockLabel ? ` // REQUIRED: ${status.objective.unlockLabel.replace(/-/g, " ").toUpperCase()}` : ""}</small><div><i style={{ width: `${status.objective.progress}%` }} /></div><em>{status.objective.elapsed.toFixed(1)}/{status.objective.limit}s // +{status.objective.reward} SIG {status.objective.best === null ? "" : `// BEST ${status.objective.best.toFixed(1)}`}</em></section>
+          {status.flow.state !== "idle" && <section className={`flow-rail ${status.flow.state}`} aria-label="Flow Circuit mastery status"><span>FLOW CIRCUIT // {status.flow.state.toUpperCase()}</span><strong>{status.flow.steps}/{status.flow.target} VARIED MOVES</strong><small>{status.flow.lastAction} // {status.flow.window.toFixed(1)}s WINDOW</small><div><i style={{ width: `${Math.min(100, (status.flow.steps / status.flow.target) * 100)}%` }} /></div><em>BEST {status.flow.best}/{status.flow.target} // {status.flow.completed} CHARTED</em></section>}
           <p className="system-note" role="status" aria-live="polite">{status.notification}</p>
           {status.diagnosticsVisible && <DiagnosticsOverlay status={status} />}
           {status.navigation.visible && <TacticalAtlas status={status} />}

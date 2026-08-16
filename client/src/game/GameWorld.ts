@@ -6,6 +6,7 @@ import { GameSignalBus } from "./GameSignals";
 import type { CameraRig } from "./CameraRig";
 import { ChallengeManager } from "./ChallengeManager";
 import type { CityBuilder } from "./CityBuilder";
+import { FlowCircuitManager, type FlowEvent } from "./FlowCircuitManager";
 import { InputManager } from "./InputManager";
 import { NavigationManager } from "./NavigationManager";
 import { ObjectiveManager, type ObjectiveEvent } from "./ObjectiveManager";
@@ -41,6 +42,7 @@ export class GameWorld {
   private readonly progression: ProgressionManager;
   private readonly navigation: NavigationManager;
   private readonly objectives: ObjectiveManager;
+  private readonly flow: FlowCircuitManager;
   private settings: GameplaySettings;
   private readonly audio: AudioManager;
   private readonly signals = new GameSignalBus();
@@ -66,6 +68,7 @@ export class GameWorld {
     this.progression = new ProgressionManager(scene);
     this.navigation = new NavigationManager(city);
     this.objectives = new ObjectiveManager(scene, city, this.progression.getObjectives());
+    this.flow = new FlowCircuitManager();
     this.settings = loadSettings();
     this.audio = new AudioManager(this.settings);
     this.simulation = new SimulationDirector(this.ambient, this.signals, this.city);
@@ -119,6 +122,8 @@ export class GameWorld {
         const actions = this.showcase || this.navigation.isVisible ? idleInput : (this.demo ? this.demoInput(delta) : raw);
         this.camera.look(actions.lookX, actions.lookY);
         this.player.update(actions, this.camera, this.city, delta, true);
+        const flowEvent = this.flow.update(delta);
+        if (flowEvent) this.handleFlowEvent(flowEvent);
         this.audio.update(this.player.getSpeed(), this.player.traversal, this.weatherMode, delta);
         this.camera.registerImpact(this.player.consumeImpact());
         this.camera.update(this.player.root.position, this.player.getSpeed(), this.city, delta, ["swing", "zip", "dive"].includes(this.player.traversal));
@@ -225,6 +230,7 @@ export class GameWorld {
     else this.challenge.reset();
     this.progression.resetRun();
     this.objectives.resetRun();
+    this.flow.resetRun();
     this.navigation.setVisible(false);
     this.phase = "playing";
     this.notification = completedRoute ? `New contract live: ${this.challenge.readout().route}.` : "Route re-entered at Sector Zero.";
@@ -264,6 +270,8 @@ export class GameWorld {
   private handleSignal(signal: import("./GameSignals").GameSignal): void {
     if (signal.type === "traversal") {
       this.camera.registerTraversalSignal(signal);
+      const flowEvent = this.flow.recordAction(signal);
+      if (flowEvent) this.handleFlowEvent(flowEvent);
       if (signal.action === "web-attached") this.audio.cue("swing");
       else if (signal.action === "zip-started") this.audio.cue("zip");
       else if (signal.action === "landed") this.audio.cue("land");
@@ -275,6 +283,12 @@ export class GameWorld {
       this.eventIntensity = signal.intensity;
       if (signal.id && signal.intensity > 0) this.notification = `${signal.label} // live.`;
     }
+  }
+
+  private handleFlowEvent(event: FlowEvent): void {
+    if (event.type !== "completed") return;
+    this.notification = `FLOW CIRCUIT COMPLETE // ${event.readout.completed} charted // best ${event.readout.best}/${event.readout.target}.`;
+    this.audio.cue("discover");
   }
 
   private setShowcase(value: boolean): void {
@@ -371,6 +385,7 @@ export class GameWorld {
       diagnosticsVisible: this.diagnosticsVisible,
       navigation: this.navigation.readout(),
       objective: this.objectives.readout(),
+      flow: this.flow.readout(),
     };
     window.dispatchEvent(new CustomEvent<GameStatus>("megapolis:status", { detail: status }));
   }

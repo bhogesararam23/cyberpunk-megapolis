@@ -106,6 +106,17 @@ export interface ObjectiveReadout {
   total: number;
 }
 
+/** A compact, player-owned record of varied high-speed traversal actions. */
+export interface FlowReadout {
+  state: "idle" | "building" | "complete";
+  steps: number;
+  target: number;
+  window: number;
+  lastAction: string;
+  best: number;
+  completed: number;
+}
+
 /** Runtime-only controls for the in-world photo deck; these do not create a separate scene or simulation. */
 export interface PhotoReadout {
   active: boolean;
@@ -142,6 +153,7 @@ export interface GameStatus {
   diagnosticsVisible: boolean;
   navigation: NavigationReadout;
   objective: ObjectiveReadout;
+  flow: FlowReadout;
 }
 
 export interface InputSnapshot {
