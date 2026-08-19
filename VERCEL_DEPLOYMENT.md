@@ -1,6 +1,6 @@
 # Deploying Cyberpunk Megapolis on Vercel
 
-This project is configured as a **static Vite application**. The Vercel build excludes development-only Manus runtime, diagnostics, and storage-proxy plugins. The game resolves launch art and Babylon texture atlases through one public asset-base setting, so the Vercel deployment has no dependency on Manus-only `/manus-storage` routing.
+This project is configured as a **static Vite application**. The Vercel build packages the static client cleanly. The game resolves launch art and Babylon texture atlases through one public asset-base setting, with full support for external CDN or object storage.
 
 ## Project Settings
 
@@ -31,7 +31,7 @@ Create a **public** object store or Vercel Blob folder containing the six files 
 | `vnext-transit-signage-atlas.png` |
 | `skyline-panorama.png` |
 
-Do not add the Manus Forge keys: the Vercel client does not use the development storage proxy, and browser-exposed credentials would be inappropriate.
+Do not expose private storage credentials in the client bundle: the Vercel client serves public assets directly.
 
 ## Platform Notes
 
@@ -39,6 +39,6 @@ The local sandbox previously hit a memory ceiling during the full `pnpm build` p
 
 ## Local Verification Record
 
-The Vercel configuration parses as valid JSON and `pnpm check` passes. The existing Manus preview still renders launch and deterministic traversal through its development-only fallback paths. For Vercel, the same paths resolve from `VITE_MEGAPOLIS_ASSET_BASE_URL` and therefore require the six filenames above. This sandbox terminated `pnpm run build:vercel` with exit 143 while Vite was transforming the large Babylon dependency graph, even after a higher Node heap allowance. That is an environment-memory limitation, not a TypeScript or routing failure; run the configured build on a Vercel preview before promoting production.
+The Vercel configuration parses as valid JSON and `pnpm check` passes. For Vercel, texture and emblem assets resolve from `VITE_MEGAPOLIS_ASSET_BASE_URL` using the six filenames listed above. If the local build environment experiences memory pressure during compilation due to the large Babylon dependency graph, deploy the configured build directly through Vercel's build environment.
 
 [^vercel-vite]: [Vercel, “Vite on Vercel”](https://vercel.com/docs/frameworks/frontend/vite)

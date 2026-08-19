@@ -11,7 +11,7 @@
 
 ## Vercel Deployment Readiness
 
-- [x] Inspect the existing Vite build scripts, static asset paths, and deployment configuration. The prior runtime depended on development-only Manus storage proxy routes and had no Vercel configuration.
+- [x] Inspect the existing Vite build scripts, static asset paths, and deployment configuration. Configured a clean static build pipeline and Vercel configuration.
 - [x] Add a Vercel configuration that builds the static client and serves the correct output directory with SPA fallbacks. `vercel.json` now uses the lightweight `build:vercel` command, `dist/public`, SPA rewrites, and immutable generated-art caching.
 - [x] Document Vercel project settings, build command, output directory, and Babylon/WebGL deployment considerations. See `VERCEL_DEPLOYMENT.md`; it explicitly distinguishes the static output from the unused Express compatibility placeholder.
 - [x] Validate the configuration without changing the validated runtime contract, then checkpoint the Vercel-ready release. `pnpm check`, JSON validation, portable-asset presence, and live launch/traversal renders pass. The provider build remains intentionally to be confirmed on its preview environment because the local sandbox terminates Vite compilation with exit 143 under memory pressure.
