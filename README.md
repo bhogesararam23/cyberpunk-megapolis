@@ -148,17 +148,26 @@ cyberpunk-megapolis/
 * **Pointer Lock on Firefox**: Firefox sometimes shows a little permission prompt when requesting pointer lock for the first time. Just hit allow and click back into the game canvas.
 * **Window Resizing**: Toggling in and out of browser fullscreen might occasionally throw off the HUD aspect ratio for a split second until the resize observer catches up.
 
----
+## Roadmap
 
-## Roadmap / Things I Want to Add
+Here is what is currently live in the engine and what is on deck for upcoming updates:
 
-- [ ] Gamepad / controller support (Xbox and DualSense mappings)
-- [ ] More acrobatic air tricks while holding shift during high dives
-- [ ] Sound effect toggle for retro synthwave background track
-- [ ] Custom community time-trial course creator with shareable URL hashes
-- [ ] Traffic collision hazards on lower street levels
+### Up Next / In Progress
+- [ ] **Gamepad & Controller Support**: Native Xbox and DualSense controller bindings via the Gamepad API, with analog stick camera panning and trigger-based swing tension.
+- [ ] **Mid-Air Trick System**: Holding sprint during high-altitude dives to perform aerial flips and spins that feed bonus momentum into the Flow Circuit combo.
+- [ ] **Custom Route Creator**: Tool to drop custom waypoint markers across the city and export time-trial challenges as shareable URL hashes.
+- [ ] **Subway & Underground Corridors**: High-speed transit tunnels connecting the Civic Core directly to the lower Foundry sector.
+- [ ] **Street-Level Traffic Hazards**: Physical vehicle collision boxes for air cabs and ground transport when dropping down to street canyons.
 
----
+### Recently Shipped
+- [x] Full 60fps kinetic web-swinging, point zip, dive acceleration, and wall-running traversal.
+- [x] Dual avatar selection with distinct movement physics (Vanta Kinetic Weave and Kite Vector Pulse).
+- [x] Procedural 4-district city generation with structural anchors, monorails, and skybridges.
+- [x] Dynamic weather engine (rain storms, lightning flashes, dusk fog) and dusk-to-dawn lighting cycles.
+- [x] Real-time tactical city atlas and waypoint navigation overlay (press `M`).
+- [x] Procedural Web Audio soundscape with zero sound asset loading overhead.
+- [x] Flow Circuit combo system and local best-record persistence for timed contracts.
+- [x] Adaptive Quality Manager with automatic post-processing throttling on low-spec hardware.
 
 ## License
 
